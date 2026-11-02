@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mr. Clippy</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Mr. Clippy</h1>
+      <p id="status">Watching</p>
+    </header>
+
+    <section class="apikey">
+      <label for="apikey">Anthropic API key</label>
+      <input type="password" id="apikey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
+      <p class="hint" id="apikey-hint">Needed to chat with him. Stored on this machine only — never synced.</p>
+    </section>
+
+    <section class="rows">
+      <label class="row">
+        <span>Enabled</span>
+        <input type="checkbox" id="enabled" />
+      </label>
+
+      <label class="row">
+        <span>Mute suggestions<small>Clicking him still works</small></span>
+        <input type="checkbox" id="muted" />
+      </label>
+
+      <label class="row">
+        <span>On this site<small id="host">—</small></span>
+        <input type="checkbox" id="host-enabled" />
+      </label>
+
+      <label class="row">
+        <span>Sounds</span>
+        <input type="checkbox" id="sound" />
+      </label>
+
+      <label class="row">
+        <span>Test mode<small>No rate limit. He gets chatty.</small></span>
+        <input type="checkbox" id="debug" />
+      </label>
+    </section>
+
+    <section class="snooze">
+      <span class="snooze-label">Snooze</span>
+      <div class="snooze-buttons">
+        <button type="button" data-snooze="15 minutes">15m</button>
+        <button type="button" data-snooze="1 hour">1h</button>
+        <button type="button" data-snooze="Rest of today">Today</button>
+      </div>
+    </section>
+
+    <footer>
+      <button type="button" id="reset-dismissals">Forget what I've dismissed</button>
+    </footer>
+
+    <script type="module" src="./popup.ts"></script>
+  </body>
+</html>

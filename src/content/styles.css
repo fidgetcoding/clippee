@@ -1,0 +1,531 @@
+/**
+ * Lives inside a shadow root, so nothing here leaks to the page and nothing on
+ * the page reaches in. Selectors stay simple for that reason.
+ *
+ * The balloon is the Office 97 look rebuilt from scratch — authored CSS and a
+ * border, not extracted artwork. It carries no licensing weight, which is why
+ * the aesthetic survives even a build that ships no Microsoft assets at all.
+ *
+ * Deliberately light-only. This is chrome that sits over someone else's page;
+ * following the OS theme would make it fight whatever it is floating above.
+ */
+
+:host {
+  all: initial;
+}
+
+.mrclippy-agent {
+  position: fixed;
+  z-index: 2147483000;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.mrclippy-agent:active {
+  cursor: grabbing;
+}
+
+.mrclippy-agent:focus-visible {
+  outline: 2px solid #0b6b68;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.mrclippy-sprite {
+  image-rendering: auto;
+  pointer-events: none;
+}
+
+.mrclippy-balloon {
+  position: fixed;
+  z-index: 2147483001;
+  max-width: 320px;
+  min-width: 160px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+
+  background: #ffffdc;
+  border: 1px solid #7f7f6d;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+
+  font-family: "Segoe UI", Tahoma, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #141400;
+}
+
+.mrclippy-balloon[hidden] {
+  display: none;
+}
+
+.mrclippy-balloon-content {
+  overflow-wrap: anywhere;
+}
+
+/* The tail. Rotated square rather than a border triangle so the 1px outline
+   continues cleanly around the corner. */
+.mrclippy-balloon-tip {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #ffffdc;
+  transform: rotate(45deg);
+}
+
+.mrclippy-balloon[data-side^="top"] .mrclippy-balloon-tip {
+  bottom: -8px;
+  border-right: 1px solid #7f7f6d;
+  border-bottom: 1px solid #7f7f6d;
+}
+
+.mrclippy-balloon[data-side^="bottom"] .mrclippy-balloon-tip {
+  top: -8px;
+  border-left: 1px solid #7f7f6d;
+  border-top: 1px solid #7f7f6d;
+}
+
+.mrclippy-balloon[data-side$="left"] .mrclippy-balloon-tip {
+  right: 28px;
+}
+
+.mrclippy-balloon[data-side$="right"] .mrclippy-balloon-tip {
+  left: 28px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mrclippy-agent,
+  .mrclippy-balloon {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+.mrclippy-balloon-text {
+  margin-bottom: 10px;
+}
+
+.mrclippy-balloon-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.mrclippy-btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 12px;
+  border: 1px solid #7f7f6d;
+  border-radius: 4px;
+  background: #f3f3e0;
+  color: #141400;
+  cursor: pointer;
+}
+
+.mrclippy-btn:hover {
+  background: #e8e8d0;
+}
+
+.mrclippy-btn:focus-visible {
+  outline: 2px solid #0b6b68;
+  outline-offset: 1px;
+}
+
+.mrclippy-btn-primary {
+  background: #0b6b68;
+  border-color: #064442;
+  color: #ffffff;
+}
+
+.mrclippy-btn-primary:hover {
+  background: #08544f;
+}
+
+/* ---------- Office 97 chrome ----------
+   Beveled borders, MS Sans Serif, no rounded corners. This is authored CSS
+   reproducing an era's visual language, not extracted Microsoft artwork —
+   which is why the look survives a build that ships no Microsoft assets. */
+
+.mrclippy-balloon:has(.mrclippy-panel) {
+  width: 340px;
+  max-width: 340px;
+  padding: 0;
+  background: #c0c0c0;
+  border: 1px solid #000000;
+  border-radius: 0;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
+  font-family: "MS Sans Serif", Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 12px;
+}
+
+.mrclippy-balloon:has(.mrclippy-panel) .mrclippy-balloon-tip {
+  display: none;
+}
+
+.mrclippy-panel {
+  /* Outer bevel: light top-left, dark bottom-right. */
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #808080;
+  border-bottom: 1px solid #808080;
+  padding: 2px;
+}
+
+.mrclippy-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 2px 4px;
+  background: linear-gradient(90deg, #000080, #1084d0);
+  color: #ffffff;
+}
+
+.mrclippy-title {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.mrclippy-titlebtn {
+  width: 16px;
+  height: 14px;
+  padding: 0;
+  font: inherit;
+  font-size: 9px;
+  line-height: 1;
+  color: #000000;
+  background: #c0c0c0;
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  cursor: pointer;
+}
+
+.mrclippy-titlebtn:active {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+
+.mrclippy-body {
+  padding: 8px;
+  background: #ffffdc;
+  border-top: 1px solid #808080;
+  border-left: 1px solid #808080;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+  color: #000000;
+}
+
+.mrclippy-prompt {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* ---------- menu ---------- */
+
+.mrclippy-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mrclippy-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 4px 5px;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  color: #000000;
+  background: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.mrclippy-option:hover,
+.mrclippy-option:focus-visible {
+  background: #000080;
+  color: #ffffff;
+  outline: none;
+}
+
+/* The radio dot, drawn rather than an input — Clippy's options were never
+   really radios, they just looked like them. */
+.mrclippy-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffffff;
+  border-top: 1px solid #808080;
+  border-left: 1px solid #808080;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+  box-shadow: 0 0 0 1px #404040;
+}
+
+.mrclippy-option:hover .mrclippy-dot,
+.mrclippy-option:focus-visible .mrclippy-dot {
+  background: #000080;
+  box-shadow: 0 0 0 1px #ffffff;
+}
+
+.mrclippy-back {
+  margin-bottom: 7px;
+  padding: 1px 6px;
+  font: inherit;
+  font-size: 11px;
+  color: #000000;
+  background: #c0c0c0;
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  cursor: pointer;
+}
+
+.mrclippy-back:active {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+
+/* ---------- findings ---------- */
+
+.mrclippy-findings {
+  display: flex;
+  flex-direction: column;
+}
+
+.mrclippy-finding {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 5px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  border-top: 1px solid #d8c88a;
+}
+
+.mrclippy-finding span {
+  flex: 1;
+}
+
+.mrclippy-dismiss {
+  flex: none;
+  width: 15px;
+  height: 14px;
+  padding: 0;
+  font: inherit;
+  font-size: 9px;
+  line-height: 1;
+  color: #000000;
+  background: #c0c0c0;
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  cursor: pointer;
+}
+
+.mrclippy-dismiss:active {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+
+/* ---------- chat ---------- */
+
+.mrclippy-log {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.mrclippy-log:not(:empty) {
+  margin-bottom: 8px;
+  padding: 6px;
+  background: #ffffff;
+  border-top: 1px solid #808080;
+  border-left: 1px solid #808080;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+}
+
+.mrclippy-turn {
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mrclippy-turn-user {
+  font-weight: 700;
+}
+
+.mrclippy-turn-user::before {
+  content: "You: ";
+}
+
+.mrclippy-turn-error {
+  color: #800000;
+}
+
+.mrclippy-pending {
+  color: #606060;
+  font-style: italic;
+}
+
+.mrclippy-composer {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+
+.mrclippy-input {
+  flex: 1;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 3px 4px;
+  color: #000000;
+  background: #ffffff;
+  border-top: 1px solid #808080;
+  border-left: 1px solid #808080;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+  border-radius: 0;
+  resize: none;
+}
+
+.mrclippy-input:focus-visible {
+  outline: 1px dotted #000000;
+  outline-offset: -3px;
+}
+
+.mrclippy-btn {
+  font: inherit;
+  font-size: 12px;
+  min-width: 54px;
+  padding: 3px 10px;
+  color: #000000;
+  background: #c0c0c0;
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.mrclippy-btn:active:not(:disabled) {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+
+.mrclippy-btn:disabled {
+  color: #808080;
+  cursor: default;
+}
+
+.mrclippy-btn-primary {
+  font-weight: 700;
+}
+
+/* ---------- the character's own close button ---------- */
+
+.mrclippy-agent-close {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 17px;
+  height: 15px;
+  padding: 0;
+  font-family: "MS Sans Serif", Tahoma, sans-serif;
+  font-size: 9px;
+  line-height: 1;
+  color: #000000;
+  background: #c0c0c0;
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.mrclippy-agent:hover .mrclippy-agent-close,
+.mrclippy-agent:focus-within .mrclippy-agent-close,
+.mrclippy-agent-close:focus-visible {
+  opacity: 1;
+}
+
+.mrclippy-agent-close:active {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mrclippy-agent-close {
+    transition: none;
+  }
+}
+
+/* ---------- quick-start chips ---------- */
+
+.mrclippy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+
+.mrclippy-chips[hidden] {
+  display: none;
+}
+
+.mrclippy-chip {
+  font-family: "MS Sans Serif", Tahoma, sans-serif;
+  font-size: 11px;
+  padding: 2px 7px;
+  color: #000000;
+  background: #c0c0c0;
+  border-top: 1px solid #ffffff;
+  border-left: 1px solid #ffffff;
+  border-right: 1px solid #404040;
+  border-bottom: 1px solid #404040;
+  cursor: pointer;
+}
+
+.mrclippy-chip:active {
+  border-color: #404040 #ffffff #ffffff #404040;
+}
+
+.mrclippy-titlebtns {
+  display: flex;
+  gap: 2px;
+}
+
+/* The log is always present now, so give it a resting height rather than
+   letting the panel jump between one turn and many. */
+.mrclippy-log {
+  min-height: 64px;
+  margin-bottom: 8px;
+  padding: 6px;
+  background: #ffffff;
+  border-top: 1px solid #808080;
+  border-left: 1px solid #808080;
+  border-right: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+}
+
+.mrclippy-turn-assistant::before {
+  content: "Mr. Clippy: ";
+  font-weight: 700;
+}
+
+.mrclippy-turn-assistant .mrclippy-findings {
+  margin-top: 4px;
+}
