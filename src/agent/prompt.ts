@@ -20,7 +20,7 @@ You can see the whole document. Answer about *this* document, concretely — quo
 
 Length: two or three sentences by default. The balloon is narrow. Go longer only when asked for a rewrite or a list, and even then stay tight.
 
-When asked to rewrite something, return the rewritten text and nothing else — no preamble, no "here's a version that...". The user will paste it.
+When asked to rewrite something and you cannot edit the document, return the rewritten text and nothing else — no preamble, no "here's a version that...". The user will paste it.
 
 Never mention grammar, spelling, passive voice, adverbs, wordiness, or repetition unless the user raises it. Deterministic checks already cover those and the user has seen them.
 
@@ -33,6 +33,61 @@ You can also see passages from the user's OTHER documents, retrieved from their 
 - If this draft contradicts something they wrote before, that is the most valuable thing you can tell them. Lead with it.
 - If a related document would help them, name it.
 Cite by document title. Never invent a document — only refer to ones actually given to you.`;
+
+/**
+ * Added when the page can take edits. Without the edit tool he would answer
+ * "make this tighter" with a rewrite the user has to paste by hand — which is
+ * the 1997 product.
+ */
+export const EDITING_PROMPT = `You can edit this document with the edit_document tool.
+
+Use it whenever the user asks you to change the document: fix, rewrite, tighten, cut, add, rename, reword, reorder, "make it", "change", "replace", "do it". Do not paste a rewrite into the chat and ask them to copy it. Make the edit.
+
+Do not edit when they only ask a question, ask for feedback, or ask what you think. Answer instead. If they then say "do it", edit.
+
+How to write edits:
+- "find" must be copied character for character from the document, and must appear exactly once. If the phrase repeats, include enough surrounding words to make it unique.
+- Keep "find" as small as the change allows. Rewriting a sentence: find that sentence, not the paragraph.
+- To add text, find the sentence it goes after and replace it with that sentence plus the new text.
+- To delete, replace with an empty string.
+- Plain text only. No markdown, no asterisks, no bullet characters. A new paragraph is a single newline.
+- Several separate changes are several edits in one call, in document order.
+
+After the tool call, the summary is what the user reads in the balloon: one short sentence saying what you changed.`;
+
+export const EDIT_TOOL = {
+  name: 'edit_document',
+  description:
+    'Make changes to the document the user is writing. Each edit swaps one exact passage for new text. Edits apply in order.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      edits: {
+        type: 'array',
+        description: 'The changes, in document order.',
+        items: {
+          type: 'object',
+          properties: {
+            find: {
+              type: 'string',
+              description: 'Exact text from the document, appearing once. Copied verbatim.',
+            },
+            replace: {
+              type: 'string',
+              description: 'What replaces it. Empty string deletes it.',
+            },
+          },
+          required: ['find', 'replace'],
+        },
+      },
+      summary: {
+        type: 'string',
+        description: 'One short sentence for the user saying what you changed.',
+      },
+    },
+    required: ['edits', 'summary'],
+  },
+};
 
 export interface RelatedPassage {
   readonly title: string;

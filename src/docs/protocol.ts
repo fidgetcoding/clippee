@@ -15,11 +15,26 @@ export const EVENT_RESPONSE = 'mr-clippy:gdocs:response';
 
 export const DEFAULT_TIMEOUT_MS = 2_000;
 
+/** A replace waits for Docs to re-render before it can verify, so it gets longer. */
+export const REPLACE_TIMEOUT_MS = 4_000;
+
 export type DocsRequest =
   | { kind: 'getText' }
   | { kind: 'getSelection' }
   | { kind: 'setSelection'; start: number; end: number }
+  | { kind: 'replace'; find: string; text: string; near?: number }
   | { kind: 'probe' };
+
+/** Why an edit did not land. Each one reads differently to the user. */
+export type EditFailure =
+  | 'not-found'
+  | 'ambiguous'
+  | 'unavailable'
+  | 'unverified';
+
+export type EditOutcome =
+  | { readonly applied: true; readonly start: number }
+  | { readonly applied: false; readonly reason: EditFailure };
 
 export interface DocsSelection {
   readonly start: number;
@@ -41,6 +56,7 @@ export type DocsResponse =
   | { kind: 'getText'; text: string; strategy: ReadStrategy }
   | { kind: 'getSelection'; selection: DocsSelection | undefined }
   | { kind: 'setSelection'; applied: boolean }
+  | { kind: 'replace'; outcome: EditOutcome }
   | { kind: 'probe'; annotatedApi: boolean; rectCount: number; flagSet: boolean }
   | { kind: 'error'; requestKind: DocsRequest['kind']; message: string };
 

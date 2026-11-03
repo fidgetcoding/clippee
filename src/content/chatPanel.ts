@@ -6,8 +6,24 @@ export interface QuickAction {
   readonly question: string;
 }
 
+/** One edit as it actually went, for the receipt under his reply. */
+export interface AgentChange {
+  readonly find: string;
+  readonly replace: string;
+  readonly applied: boolean;
+  /** Plain-English reason, when it did not apply. */
+  readonly reason?: string;
+}
+
+export interface AgentReply {
+  readonly text: string;
+  readonly changes?: readonly AgentChange[];
+}
+
 export interface ChatPanelOptions {
-  readonly onAsk: (question: string, history: readonly ChatTurn[]) => Promise<string>;
+  readonly onAsk: (question: string, history: readonly ChatTurn[]) => Promise<AgentReply>;
+  /** Reverse the applied changes from one reply. Resolves to a line for the log. */
+  readonly onUndo?: (changes: readonly AgentChange[]) => Promise<string>;
   /** The structure audit. Runs the local-then-cloud ladder, not a chat turn. */
   readonly onAudit: () => Promise<string>;
   /** Local findings, offered as an opening move rather than shoved at the user. */
@@ -31,7 +47,7 @@ export const QUICK_ACTIONS: readonly QuickAction[] = [
     id: 'tighten',
     label: 'Tighten this',
     question:
-      'Pick the flabbiest paragraph in this document and rewrite it tighter. Show me the rewrite only.',
+      'Pick the flabbiest paragraph in this document and tighten it in place. Keep my voice and every fact.',
   },
   {
     id: 'summarize',
@@ -97,7 +113,7 @@ export class ChatPanel {
     this.input = document.createElement('textarea');
     this.input.className = 'mrclippy-input';
     this.input.rows = 2;
-    this.input.placeholder = 'Ask me anything about this document…';
+    this.input.placeholder = 'Ask a question, or tell me what to change…';
     this.input.setAttribute('aria-label', 'Ask Mr. Clippy');
 
     this.send = document.createElement('button');
@@ -273,6 +289,73 @@ export class ChatPanel {
   }
 
   /**
+   * What he actually changed, under what he said. Every edit is listed, so a
+   * change can never happen without the user being able to see it, and the ones
+   * that failed say why instead of vanishing.
+   */
+  private receipt(changes: readonly AgentChange[]): HTMLElement {
+    const box = document.createElement('div');
+    box.className = 'mrclippy-receipt';
+
+    const applied = changes.filter((c) => c.applied);
+    const head = document.createElement('div');
+    head.className = 'mrclippy-receipt-head';
+    head.textContent =
+      applied.length === changes.length
+        ? `Changed ${applied.length} thing${applied.length === 1 ? '' : 's'}.`
+        : `Changed ${applied.length} of ${changes.length}.`;
+    box.appendChild(head);
+
+    for (const change of changes) {
+      const row = document.createElement('div');
+      row.className = `mrclippy-change${change.applied ? '' : ' mrclippy-change-failed'}`;
+
+      const before = document.createElement('del');
+      before.textContent = clip(change.find);
+      row.appendChild(before);
+
+      if (change.replace.length > 0) {
+        const after = document.createElement('ins');
+        after.textContent = clip(change.replace);
+        row.appendChild(after);
+      }
+
+      if (!change.applied && change.reason) {
+        const why = document.createElement('div');
+        why.className = 'mrclippy-change-why';
+        why.textContent = change.reason;
+        row.appendChild(why);
+      }
+      box.appendChild(row);
+    }
+
+    const { onUndo } = this.options;
+    if (onUndo && applied.length > 0) {
+      const undo = document.createElement('button');
+      undo.type = 'button';
+      undo.className = 'mrclippy-btn';
+      undo.textContent = 'Undo';
+      undo.addEventListener('click', () => {
+        undo.disabled = true;
+        undo.textContent = 'Undoing…';
+        void onUndo(applied)
+          .then((line) => {
+            undo.remove();
+            this.appendText('assistant', line);
+          })
+          .catch((error: unknown) => {
+            undo.disabled = false;
+            undo.textContent = 'Undo';
+            this.appendText('error', error instanceof Error ? error.message : 'Undo failed.');
+          });
+      });
+      box.appendChild(undo);
+    }
+
+    return box;
+  }
+
+  /**
    * One turn. `shownAs` lets a quick-action chip show its short label in the
    * transcript while the model receives the full instruction.
    */
@@ -291,8 +374,14 @@ export class ChatPanel {
     try {
       const reply = await this.options.onAsk(question, [...this.history]);
       pending.classList.remove('mrclippy-pending');
-      pending.textContent = reply;
-      this.history.push({ role: 'user', text: question }, { role: 'assistant', text: reply });
+      pending.textContent = reply.text;
+      if (reply.changes && reply.changes.length > 0) {
+        pending.appendChild(this.receipt(reply.changes));
+      }
+      this.history.push(
+        { role: 'user', text: question },
+        { role: 'assistant', text: describeForHistory(reply) },
+      );
     } catch (error: unknown) {
       pending.remove();
       this.appendText('error', error instanceof Error ? error.message : 'Something went wrong.');
@@ -304,4 +393,21 @@ export class ChatPanel {
       this.scroll();
     }
   }
+}
+
+/** Long passages are shortened in the receipt; the document has the full text. */
+function clip(text: string, max = 140): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? `${flat.slice(0, max - 1)}\u2026` : flat;
+}
+
+/**
+ * The model's memory of its own turn. Without the edits in it, a follow-up like
+ * "undo the second one" or "now do the same to the intro" has nothing to refer to.
+ */
+function describeForHistory(reply: AgentReply): string {
+  const applied = reply.changes?.filter((c) => c.applied) ?? [];
+  if (applied.length === 0) return reply.text;
+  const list = applied.map((c) => `- "${c.find}" -> "${c.replace}"`).join('\n');
+  return `${reply.text}\n\n[Edits I made to the document:\n${list}]`;
 }

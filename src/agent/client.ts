@@ -5,8 +5,14 @@ import Anthropic, {
   PermissionDeniedError,
   RateLimitError,
 } from '@anthropic-ai/sdk';
-import { SYSTEM_PROMPT, buildDocumentBlock } from './prompt';
-import { MAX_HISTORY_TURNS, type AskRequest, type AskResponse } from './types';
+import { EDITING_PROMPT, EDIT_TOOL, SYSTEM_PROMPT, buildDocumentBlock } from './prompt';
+import {
+  MAX_EDITS,
+  MAX_HISTORY_TURNS,
+  type AskRequest,
+  type AskResponse,
+  type DocumentEdit,
+} from './types';
 
 /**
  * Talks to Claude.
@@ -18,8 +24,9 @@ import { MAX_HISTORY_TURNS, type AskRequest, type AskResponse } from './types';
  * `runtime.sendMessage` and never sees the key at all.
  */
 
-const MODEL = 'claude-opus-5';
-const MAX_TOKENS = 4_000;
+const MODEL = 'claude-opus-5-5';
+// Room for a multi-edit rewrite: every edit carries its `find` and its `replace`.
+const MAX_TOKENS = 8_000;
 
 let cached: { key: string; client: Anthropic } | undefined;
 
@@ -63,11 +70,17 @@ export async function ask(request: AskRequest, apiKey: string): Promise<AskRespo
   try {
     // Streaming because the document can be long and thinking is on by default
     // on this model — a non-streaming call risks the HTTP timeout.
+    const system: Anthropic.TextBlockParam[] = [
+      { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
+    ];
+    if (request.canEdit) system.push({ type: 'text', text: EDITING_PROMPT });
+
     const stream = client.messages.stream({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+      system,
       messages,
+      ...(request.canEdit ? { tools: [EDIT_TOOL] } : {}),
     });
 
     const message = await stream.finalMessage();
@@ -82,12 +95,47 @@ export async function ask(request: AskRequest, apiKey: string): Promise<AskRespo
       .join('')
       .trim();
 
+    const call = message.content.find(
+      (block): block is Anthropic.ToolUseBlock =>
+        block.type === 'tool_use' && block.name === EDIT_TOOL.name,
+    );
+    if (call) {
+      const parsed = parseEditCall(call.input);
+      if (parsed.edits.length > 0) {
+        return { ok: true, text: parsed.summary || text || 'Done.', edits: parsed.edits };
+      }
+    }
+
     return text.length > 0
       ? { ok: true, text }
       : { ok: false, error: 'Claude had nothing to say about that.' };
   } catch (error: unknown) {
     return { ok: false, ...describe(error) };
   }
+}
+
+/**
+ * The tool input is model output: validate it like any other untrusted input.
+ * Malformed entries are dropped, not repaired, and an edit that changes nothing
+ * is not an edit.
+ */
+export function parseEditCall(input: unknown): { edits: DocumentEdit[]; summary: string } {
+  const record = (input ?? {}) as { edits?: unknown; summary?: unknown };
+  const summary = typeof record.summary === 'string' ? record.summary.trim() : '';
+  const raw = Array.isArray(record.edits) ? record.edits : [];
+  const edits = raw
+    .filter(
+      (e): e is DocumentEdit =>
+        e !== null &&
+        typeof e === 'object' &&
+        typeof (e as DocumentEdit).find === 'string' &&
+        typeof (e as DocumentEdit).replace === 'string' &&
+        (e as DocumentEdit).find.length > 0 &&
+        (e as DocumentEdit).find !== (e as DocumentEdit).replace,
+    )
+    .slice(0, MAX_EDITS)
+    .map((e) => ({ find: e.find, replace: e.replace }));
+  return { edits, summary };
 }
 
 /**

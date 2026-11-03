@@ -12,6 +12,14 @@ export interface AskRequest {
   readonly findings: readonly string[];
   /** Passages retrieved from the user's other documents. */
   readonly related?: readonly RelatedContext[];
+  /** True when the page can take edits, so he is given the edit tool. */
+  readonly canEdit?: boolean;
+}
+
+/** One change he wants made: swap `find` (quoted from the document) for `replace`. */
+export interface DocumentEdit {
+  readonly find: string;
+  readonly replace: string;
 }
 
 export interface RelatedContext {
@@ -43,8 +51,10 @@ export type AuditResponse =
   | { readonly ok: false; readonly error: string };
 
 export type AskResponse =
-  | { readonly ok: true; readonly text: string }
+  | { readonly ok: true; readonly text: string; readonly edits?: readonly DocumentEdit[] }
   | { readonly ok: false; readonly error: string; readonly needsKey?: boolean };
 
 export const MAX_DOCUMENT_CHARS = 60_000;
 export const MAX_HISTORY_TURNS = 12;
+/** Past this, one request is a rewrite of the document, not an edit to it. */
+export const MAX_EDITS = 25;

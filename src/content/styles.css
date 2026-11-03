@@ -335,6 +335,59 @@
   border-color: #404040 #ffffff #ffffff #404040;
 }
 
+/* ---------- edit receipt ---------- */
+
+.mrclippy-receipt {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 5px 6px;
+  font-style: normal;
+  background: #f4f4f4;
+  border: 1px solid #808080;
+}
+
+.mrclippy-receipt-head {
+  font-weight: 700;
+}
+
+.mrclippy-change {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-top: 4px;
+  border-top: 1px solid #d0d0d0;
+}
+
+.mrclippy-change del {
+  color: #800000;
+}
+
+.mrclippy-change ins {
+  color: #006000;
+  text-decoration: none;
+}
+
+.mrclippy-change ins::before {
+  content: "\2192  ";
+}
+
+.mrclippy-change-failed del {
+  color: #606060;
+  text-decoration: none;
+}
+
+.mrclippy-change-why {
+  color: #800000;
+  font-style: italic;
+}
+
+.mrclippy-receipt .mrclippy-btn {
+  align-self: flex-start;
+  margin-top: 3px;
+}
+
 /* ---------- chat ---------- */
 
 .mrclippy-log {

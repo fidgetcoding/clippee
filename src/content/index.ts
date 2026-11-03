@@ -14,8 +14,17 @@ import {
   type Settings,
 } from '../settings';
 import { resolveSource } from './documentSource';
-import { ChatPanel } from './chatPanel';
-import type { AskResponse, AuditResponse, ChatTurn } from '../agent/types';
+import { ChatPanel, type AgentChange, type AgentReply } from './chatPanel';
+import type { AskResponse, AuditResponse, ChatTurn, DocumentEdit } from '../agent/types';
+import type { EditFailure } from '../docs/protocol';
+
+/** What each failure means to someone who is not debugging the bridge. */
+const FAILURE_REASONS: Readonly<Record<EditFailure, string>> = {
+  'not-found': "Couldn't find that passage. It may have changed.",
+  ambiguous: 'That phrase appears more than once, so I left it alone.',
+  unavailable: "The page wouldn't let me type there. Reloading the tab usually fixes it.",
+  unverified: "I typed it, but couldn't confirm it landed. Check the document.",
+};
 
 const DISMISSAL_KEY = 'mrclippy:dismissals';
 
@@ -112,8 +121,11 @@ async function main(): Promise<void> {
 
   let panel: ChatPanel | undefined;
 
+  /** Where each applied edit landed, so undo can find it again. */
+  const landedAt = new WeakMap<AgentChange, number>();
+
   /** Send a question to the background worker, which owns the API key. */
-  async function askAgent(question: string, history: readonly ChatTurn[]): Promise<string> {
+  async function askAgent(question: string, history: readonly ChatTurn[]): Promise<AgentReply> {
     const document_ = (await source.read()) ?? '';
     const findings = review(document_).map((f) => f.text);
 
@@ -123,11 +135,54 @@ async function main(): Promise<void> {
       document: document_,
       history,
       findings,
+      canEdit: source.canEdit(),
     })) as AskResponse | undefined;
 
     if (!response) throw new Error('No reply from the background worker. Try reloading the tab.');
     if (!response.ok) throw new Error(response.error);
-    return response.text;
+    if (!response.edits || response.edits.length === 0) return { text: response.text };
+
+    void agent.play('Writing');
+    const changes = await applyEdits(response.edits);
+    // Anything he typed is new text: re-review it at the next seam, not now.
+    lastReviewed = '';
+    return { text: response.text, changes };
+  }
+
+  /**
+   * One at a time, in order. Each edit is located in the document as it stands
+   * after the previous one, so earlier edits can never shift a later one onto
+   * the wrong words.
+   */
+  async function applyEdits(edits: readonly DocumentEdit[]): Promise<AgentChange[]> {
+    const changes: AgentChange[] = [];
+    for (const edit of edits) {
+      const outcome = await source.replace(edit.find, edit.replace);
+      const change: AgentChange = outcome.applied
+        ? { find: edit.find, replace: edit.replace, applied: true }
+        : {
+            find: edit.find,
+            replace: edit.replace,
+            applied: false,
+            reason: FAILURE_REASONS[outcome.reason],
+          };
+      if (outcome.applied) landedAt.set(change, outcome.start);
+      changes.push(change);
+    }
+    return changes;
+  }
+
+  /** Reverse order, each one pinned to where it was written. */
+  async function undoChanges(changes: readonly AgentChange[]): Promise<string> {
+    let undone = 0;
+    for (const change of [...changes].reverse()) {
+      const outcome = await source.replace(change.replace, change.find, landedAt.get(change));
+      if (outcome.applied) undone += 1;
+    }
+    lastReviewed = '';
+    if (undone === changes.length) return 'Put it back the way it was.';
+    if (undone === 0) throw new Error("Couldn't undo that. The text has changed since. Cmd+Z still works.");
+    return `Undid ${undone} of ${changes.length}. The rest had changed since. Cmd+Z can get them.`;
   }
 
   /** Run the structure ladder and render the result as one readable answer. */
@@ -180,6 +235,7 @@ async function main(): Promise<void> {
       panel = new ChatPanel({
         findings: findings.map((f) => f.text),
         onAsk: askAgent,
+        onUndo: undoChanges,
         onAudit: auditStructure,
         onDismissFinding: (index) => {
           const finding = findings[index];

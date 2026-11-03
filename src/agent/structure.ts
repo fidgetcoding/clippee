@@ -14,7 +14,7 @@ import type { StructureSignal } from '../checks/structure';
  * with no finding has to be the comfortable answer.
  */
 
-const MODEL = 'claude-opus-5';
+const MODEL = 'claude-opus-5-5';
 
 export interface StructureFinding {
   /** The promise or imbalance being judged. */

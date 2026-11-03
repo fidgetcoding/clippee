@@ -3,10 +3,12 @@ import {
   EVENT_REQUEST,
   EVENT_RESPONSE,
   PROTOCOL,
+  REPLACE_TIMEOUT_MS,
   isResponseMessage,
   type DocsRequest,
   type DocsResponse,
   type DocsSelection,
+  type EditOutcome,
 } from './protocol';
 
 interface Pending {
@@ -100,14 +102,29 @@ export class DocsBridgeClient {
     }
   }
 
-  private send(request: DocsRequest): Promise<DocsResponse> {
+  /** Replace `find` with `text` in the document, verified by reading it back. */
+  async replace(find: string, text: string, near?: number): Promise<EditOutcome> {
+    try {
+      const response = await this.send(
+        { kind: 'replace', find, text, ...(near === undefined ? {} : { near }) },
+        REPLACE_TIMEOUT_MS,
+      );
+      return response.kind === 'replace'
+        ? response.outcome
+        : { applied: false, reason: 'unavailable' };
+    } catch {
+      return { applied: false, reason: 'unavailable' };
+    }
+  }
+
+  private send(request: DocsRequest, timeoutMs = this.timeoutMs): Promise<DocsResponse> {
     const requestId = `mr-clippy-${Date.now()}-${++this.seq}`;
 
     return new Promise<DocsResponse>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(requestId);
         reject(new Error(`Docs bridge "${request.kind}" timed out`));
-      }, this.timeoutMs);
+      }, timeoutMs);
 
       this.pending.set(requestId, { resolve, reject, timer });
       this.target.dispatchEvent(

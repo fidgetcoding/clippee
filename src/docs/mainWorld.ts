@@ -1,3 +1,4 @@
+import { landed, locate } from './match';
 import {
   EVENT_REQUEST,
   EVENT_RESPONSE,
@@ -7,6 +8,7 @@ import {
   type DocsRequest,
   type DocsResponse,
   type DocsSelection,
+  type EditOutcome,
 } from './protocol';
 import { collectSegments, readDocumentText } from './rectScrape';
 
@@ -35,10 +37,98 @@ declare global {
   }
 }
 
+/**
+ * Shapes verified live on 2026-11-02. `getSelection` returns an ARRAY of ranges
+ * (one per cursor), and `setSelection` takes two plain numbers. The first build
+ * assumed an object for both, so reading the selection always came back empty
+ * and setting it silently did nothing.
+ */
+type RawRange = { start?: number; end?: number };
+
 interface AnnotatedText {
   getText?: () => string;
-  getSelection?: () => { start?: number; end?: number } | undefined;
-  setSelection?: (selection: { start: number; end: number }) => void;
+  getSelection?: () => RawRange[] | RawRange | undefined;
+  setSelection?: (start: number, end: number) => void;
+}
+
+/**
+ * Index 0 of `getText()` is a U+0003 document marker, and every offset Docs
+ * hands out counts it. Callers outside this file see text without it, so the
+ * marker is stripped on the way out and added back on the way in.
+ */
+const MARKER = '\u0003';
+
+function markerOffset(raw: string): number {
+  return raw.startsWith(MARKER) ? 1 : 0;
+}
+
+function firstRange(raw: RawRange[] | RawRange | undefined): RawRange | undefined {
+  return Array.isArray(raw) ? raw[0] : raw;
+}
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Typing into Docs.
+ *
+ * Docs listens for input on an offscreen contenteditable inside
+ * `.docs-texteventtarget-iframe`, and it honours a synthetic paste there — the
+ * pasted text replaces whatever is selected, exactly as a real paste would, and
+ * lands in the document's own undo history. Plain text only, so formatting
+ * around the edit is kept and the replacement takes the style of where it lands.
+ */
+function paste(text: string): boolean {
+  const frame = document.querySelector<HTMLIFrameElement>('.docs-texteventtarget-iframe');
+  const doc = frame?.contentDocument;
+  if (!doc) return false;
+
+  const active = doc.activeElement as HTMLElement | null;
+  const target =
+    active?.isContentEditable === true
+      ? active
+      : (doc.querySelector<HTMLElement>('[contenteditable="true"]') ?? doc.body);
+  if (!target) return false;
+
+  const data = new DataTransfer();
+  data.setData('text/plain', text);
+  target.dispatchEvent(
+    new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }),
+  );
+  return true;
+}
+
+/**
+ * Select the passage, paste over it, then read the document back to confirm the
+ * new text is really there. Docs re-renders asynchronously, so the read polls
+ * briefly rather than trusting the first frame.
+ */
+async function replace(
+  api: AnnotatedText,
+  find: string,
+  text: string,
+  near: number | undefined,
+): Promise<EditOutcome> {
+  if (typeof api.getText !== 'function' || typeof api.setSelection !== 'function') {
+    return { applied: false, reason: 'unavailable' };
+  }
+
+  const before = api.getText();
+  const offset = markerOffset(before);
+  const hit = locate(before.slice(offset), find, near);
+  if ('error' in hit) return { applied: false, reason: hit.error };
+
+  api.setSelection(hit.start + offset, hit.end + offset);
+  await sleep(30);
+  if (!paste(text)) return { applied: false, reason: 'unavailable' };
+
+  for (let waited = 0; waited < 1_500; waited += 50) {
+    await sleep(50);
+    const after = api.getText();
+    if (after === before && find !== text) continue;
+    const body = after.slice(markerOffset(after));
+    if (landed(body, hit.start, text)) return { applied: true, start: hit.start };
+  }
+  return { applied: false, reason: 'unverified' };
 }
 
 /**
@@ -89,22 +179,27 @@ async function handle(request: DocsRequest, id: string): Promise<DocsResponse> {
       const api = await annotated(id);
       const viaApi = api?.getText?.();
       if (typeof viaApi === 'string' && viaApi.trim().length > 0) {
-        return { kind: 'getText', text: viaApi, strategy: ReadStrategy.AnnotatedApi };
+        return {
+          kind: 'getText',
+          text: viaApi.slice(markerOffset(viaApi)),
+          strategy: ReadStrategy.AnnotatedApi,
+        };
       }
       return { kind: 'getText', text: readDocumentText(), strategy: ReadStrategy.RectScrape };
     }
 
     case 'getSelection': {
       const api = await annotated(id);
-      const raw = api?.getSelection?.();
+      const raw = firstRange(api?.getSelection?.());
       if (!raw || typeof raw.start !== 'number' || typeof raw.end !== 'number') {
         return { kind: 'getSelection', selection: undefined };
       }
-      const text = api?.getText?.() ?? '';
+      const full = api?.getText?.() ?? '';
+      const offset = markerOffset(full);
       const selection: DocsSelection = {
-        start: raw.start,
-        end: raw.end,
-        text: text.slice(raw.start, raw.end),
+        start: Math.max(0, raw.start - offset),
+        end: Math.max(0, raw.end - offset),
+        text: full.slice(raw.start, raw.end),
       };
       return { kind: 'getSelection', selection };
     }
@@ -114,8 +209,15 @@ async function handle(request: DocsRequest, id: string): Promise<DocsResponse> {
       if (typeof api?.setSelection !== 'function') {
         return { kind: 'setSelection', applied: false };
       }
-      api.setSelection({ start: request.start, end: request.end });
+      const offset = markerOffset(api.getText?.() ?? '');
+      api.setSelection(request.start + offset, request.end + offset);
       return { kind: 'setSelection', applied: true };
+    }
+
+    case 'replace': {
+      const api = await annotated(id);
+      if (!api) return { kind: 'replace', outcome: { applied: false, reason: 'unavailable' } };
+      return { kind: 'replace', outcome: await replace(api, request.find, request.text, request.near) };
     }
 
     default:

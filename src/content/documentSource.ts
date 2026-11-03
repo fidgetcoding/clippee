@@ -1,4 +1,6 @@
 import { DocsBridgeClient } from '../docs/bridgeClient';
+import type { EditOutcome } from '../docs/protocol';
+import { FieldEditor } from './fieldEditor';
 
 /**
  * Where Mr. Clippy gets the text he is reasoning about.
@@ -18,22 +20,42 @@ export interface DocumentSource {
   read(): Promise<string | undefined>;
   /** Human-readable reason `read()` returned nothing. Shown in the balloon. */
   explainFailure?(): string;
+  /** True when this source can write back into what it reads right now. */
+  canEdit(): boolean;
+  /**
+   * Replace `find` with `text`. `near` picks between repeated matches and is
+   * only passed by undo, which knows where it wrote.
+   */
+  replace(find: string, text: string, near?: number): Promise<EditOutcome>;
   dispose?(): void;
 }
 
-/** Generic web page: whatever the DOM says. Works everywhere except Docs. */
-export const domSource: DocumentSource = {
-  id: 'dom',
-  matches: () => true,
-  read: async () => {
-    // Prefer the main content region: page chrome, nav and footers are somebody
-    // else's prose and would pollute every document-level statistic.
-    const main = document.querySelector<HTMLElement>('main, article, [role="main"]');
-    const text = (main ?? document.body)?.innerText ?? '';
-    return text.trim().length > 0 ? text : undefined;
-  },
-  explainFailure: () => "There's nothing here I can read.",
-};
+/**
+ * Generic web page. If you have been typing in a text box, that box is the
+ * document — it is what you are writing, and the only thing he can edit.
+ * Otherwise he reads the page.
+ */
+export function createDomSource(): DocumentSource {
+  const field = new FieldEditor();
+
+  return {
+    id: 'dom',
+    matches: () => true,
+    read: async () => {
+      const typed = field.read();
+      if (typed) return typed;
+      // Prefer the main content region: page chrome, nav and footers are somebody
+      // else's prose and would pollute every document-level statistic.
+      const main = document.querySelector<HTMLElement>('main, article, [role="main"]');
+      const text = (main ?? document.body)?.innerText ?? '';
+      return text.trim().length > 0 ? text : undefined;
+    },
+    explainFailure: () => "There's nothing here I can read.",
+    canEdit: () => field.active,
+    replace: async (find, text, near) => field.replace(find, text, near),
+    dispose: () => field.dispose(),
+  };
+}
 
 export function createDocsSource(): DocumentSource {
   let client: DocsBridgeClient | undefined;
@@ -71,6 +93,10 @@ export function createDocsSource(): DocumentSource {
 
     explainFailure: () => lastFailure,
 
+    canEdit: () => true,
+
+    replace: (find, text, near) => ensureClient().replace(find, text, near),
+
     dispose: () => {
       client?.dispose();
       client = undefined;
@@ -80,5 +106,5 @@ export function createDocsSource(): DocumentSource {
 
 export function resolveSource(): DocumentSource {
   const docs = createDocsSource();
-  return docs.matches() ? docs : domSource;
+  return docs.matches() ? docs : createDomSource();
 }
