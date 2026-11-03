@@ -135,9 +135,9 @@ export class ChatPanel {
   private startChat(title: string): Thread {
     if (!this.chatList) {
       const section = document.createElement('div');
-      section.className = 'mrclippy-turn mrclippy-turn-assistant mrclippy-chats';
+      section.className = 'mrclippy-turn mrclippy-section mrclippy-chats';
       const head = document.createElement('div');
-      head.className = 'mrclippy-receipt-head';
+      head.className = 'mrclippy-section-head';
       head.textContent = 'Your questions';
       this.chatList = document.createElement('div');
       this.chatList.className = 'mrclippy-findings';
@@ -241,10 +241,11 @@ export class ChatPanel {
     }
 
     const line = document.createElement('div');
-    line.className = 'mrclippy-turn mrclippy-turn-assistant';
+    line.className = 'mrclippy-turn mrclippy-section';
 
     const intro = document.createElement('div');
-    intro.textContent = `I noticed ${findings.length} thing${findings.length === 1 ? '' : 's'}:`;
+    intro.className = 'mrclippy-section-head';
+    intro.textContent = `${findings.length} note${findings.length === 1 ? '' : 's'}`;
     line.appendChild(intro);
 
     const list = document.createElement('div');

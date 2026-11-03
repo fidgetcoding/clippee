@@ -65,9 +65,16 @@ export function renderDiff(before: string, after: string): HTMLElement {
   };
 
   /** Text with its line breaks drawn as markers instead of swallowed as spaces. */
-  const marked = (tag: 'del' | 'ins', text: string): void => {
+  const marked = (tag: 'del' | 'ins', raw: string): void => {
     // Whitespace-only and no line break: nothing a reader could see.
+    let text = raw;
     if (!/\S|\n/.test(text)) return;
+    // Spaces at the edges belong to the sentence, not the change: drawing them
+    // inside the strike or highlight glues the mark to the next word.
+    const lead = /^[ \t]+/.test(text);
+    const trail = /[ \t]+$/.test(text);
+    text = text.replace(/^[ \t]+|[ \t]+$/g, '');
+    if (lead) line.appendChild(document.createTextNode(' '));
     const el = document.createElement(tag);
     const parts = text.split(/\n+/);
     parts.forEach((part, i) => {
@@ -81,6 +88,7 @@ export function renderDiff(before: string, after: string): HTMLElement {
       if (flat.trim().length > 0) el.appendChild(document.createTextNode(clip(flat, 400)));
     });
     line.appendChild(el);
+    if (trail) line.appendChild(document.createTextNode(' '));
   };
 
   context(lead, 'lead');

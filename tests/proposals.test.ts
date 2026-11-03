@@ -198,9 +198,9 @@ describe('one fix at a time', () => {
     for (let i = 0; i < 6; i++) await flush();
 
     expect(onApply).toHaveBeenCalledTimes(2);
-    expect(p.el.querySelector('.mrclippy-fixall')?.textContent).toContain('Applied 2 of 2');
+    expect(p.el.querySelector('.mrclippy-fixall')?.textContent).toContain('Applied 2 changes');
     const undo = p.el.querySelector<HTMLButtonElement>('.mrclippy-fixall .mrclippy-receipt .mrclippy-btn');
-    expect(undo?.textContent).toBe('Undo');
+    expect(undo?.textContent).toBe('Undo all');
   });
 
   it('a question asked from the list opens its own chat, listed for later', async () => {

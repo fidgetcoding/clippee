@@ -137,13 +137,17 @@ thread: Thread,
   const applied = changes.filter((c) => c.applied);
   const head = document.createElement('div');
   head.className = 'mrclippy-receipt-head';
-  head.textContent =
+  const headText = document.createElement('span');
+  headText.textContent =
     applied.length === changes.length
-      ? `Changed ${applied.length} thing${applied.length === 1 ? '' : 's'}.`
-      : `Changed ${applied.length} of ${changes.length}.`;
+      ? `Applied ${applied.length} change${applied.length === 1 ? '' : 's'}`
+      : `Applied ${applied.length} of ${changes.length}`;
+  head.appendChild(headText);
   box.appendChild(head);
 
-  for (const change of changes) {
+  // Failures last: what landed is what the user needs to scan first.
+  const ordered = [...changes].sort((a, b) => Number(b.applied) - Number(a.applied));
+  for (const change of ordered) {
     const row = document.createElement('div');
     row.className = `mrclippy-change${change.applied ? '' : ' mrclippy-change-failed'}`;
     row.appendChild(renderDiff(change.find, change.replace));
@@ -152,7 +156,7 @@ thread: Thread,
     if (!change.applied && change.reason) {
       const why = document.createElement('div');
       why.className = 'mrclippy-change-why';
-      why.textContent = change.reason;
+      why.textContent = `\u26a0 ${change.reason}`;
       row.appendChild(why);
     }
     box.appendChild(row);
@@ -166,11 +170,13 @@ thread: Thread,
     let undone = false;
     const toggle = document.createElement('button');
     toggle.type = 'button';
-    toggle.className = 'mrclippy-btn';
-    toggle.textContent = 'Undo';
+    toggle.className = 'mrclippy-btn mrclippy-btn-small';
+    const label = (): string =>
+      (undone ? 'Redo' : 'Undo') + (current.length > 1 ? ' all' : '');
+    toggle.textContent = label();
     const idle = (): void => {
       toggle.disabled = false;
-      toggle.textContent = undone ? 'Redo' : 'Undo';
+      toggle.textContent = label();
       box.classList.toggle('mrclippy-receipt-undone', undone);
     };
     toggle.addEventListener('click', () => {
@@ -209,7 +215,7 @@ thread: Thread,
           ctx.appendText('error', error instanceof Error ? error.message : 'Redo failed.', thread);
         });
     });
-    box.appendChild(toggle);
+    head.appendChild(toggle);
   }
 
   return box;
@@ -260,16 +266,15 @@ main: Thread,
       // One at a time: each edit is located in the document as it stands now.
       for (const t of threads) changes.push(...((await t.applyAll?.()) ?? []));
 
-      const landed = changes.filter((c) => c.applied).length;
       bar.replaceChildren();
-      const done = document.createElement('div');
-      done.className = 'mrclippy-receipt-head';
-      done.textContent =
-        changes.length === 0
-          ? 'Nothing left to apply.'
-          : `Applied ${landed} of ${changes.length} changes.`;
-      bar.appendChild(done);
-      if (changes.length > 0) bar.appendChild(receipt(ctx, changes, main));
+      if (changes.length === 0) {
+        const done = document.createElement('div');
+        done.className = 'mrclippy-fixall-hint';
+        done.textContent = 'Nothing left to apply.';
+        bar.appendChild(done);
+      } else {
+        bar.appendChild(receipt(ctx, changes, main));
+      }
     })();
   });
 
