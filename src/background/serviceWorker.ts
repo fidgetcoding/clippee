@@ -1,5 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { ask } from '../agent/client';
+import { NO_KEY, ask, clientFor, describe } from '../agent/client';
 import { auditStructure } from '../agent/structure';
 import { structureSignals } from '../checks/structure';
 import type { AskRequest, AskResponse, AuditRequest, AuditResponse } from '../agent/types';
@@ -20,14 +19,24 @@ ext.commands?.onCommand.addListener((command) => {
 });
 
 ext.runtime.onMessage.addListener(
-  (message: unknown, _sender, sendResponse: (response: AskResponse | AuditResponse) => void) => {
+  (message: unknown, sender, sendResponse: (response: AskResponse | AuditResponse) => void) => {
     if (isAskRequest(message)) {
       void (async () => {
         const settings = await loadSettings();
-        sendResponse(await ask(message, settings.apiKey));
+        sendResponse(await ask(message, settings.apiKey, settings.workspaceId));
       })();
       // Keeps the message channel open for the async reply. Returning anything
       // falsy here closes it and the content script's promise resolves undefined.
+      return true;
+    }
+
+    if (isType(message, 'mrclippy:open-settings')) {
+      void openSettings(sender.tab?.url);
+      return false;
+    }
+
+    if (isType(message, 'mrclippy:has-key')) {
+      void loadSettings().then((s) => sendResponse({ hasKey: s.apiKey.length > 0 } as never));
       return true;
     }
 
@@ -49,14 +58,14 @@ ext.runtime.onMessage.addListener(
 async function runAudit(request: AuditRequest): Promise<AuditResponse> {
   const settings = await loadSettings();
   if (!settings.apiKey) {
-    return { ok: false, error: 'No API key set. Open the popup and paste one in.' };
+    return { ok: false, error: NO_KEY, needsKey: true };
   }
 
   const signals = structureSignals(request.document);
   if (signals.length === 0) return { ok: true, findings: [] };
 
   try {
-    const client = new Anthropic({ apiKey: settings.apiKey, dangerouslyAllowBrowser: true });
+    const client = clientFor(settings.apiKey, settings.workspaceId);
     const findings = await auditStructure(client, request.document, signals);
     return {
       ok: true,
@@ -68,8 +77,35 @@ async function runAudit(request: AuditRequest): Promise<AuditResponse> {
       })),
     };
   } catch (error: unknown) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Audit failed.' };
+    return { ok: false, ...describe(error) };
   }
+}
+
+/**
+ * Settings is the popup page. The toolbar popup is the natural place for it, but
+ * `action.openPopup` is not available everywhere, so fall back to the same page
+ * in a small window of its own. Either way the key is typed into an extension
+ * page, never into the document's DOM.
+ */
+async function openSettings(fromUrl?: string): Promise<void> {
+  try {
+    await ext.action.openPopup();
+    return;
+  } catch {
+    // Fall through to a window.
+  }
+  let host = '';
+  try {
+    host = fromUrl ? new URL(fromUrl).hostname : '';
+  } catch {
+    host = '';
+  }
+  const url = ext.runtime.getURL(`src/popup/index.html?host=${encodeURIComponent(host)}`);
+  await ext.windows.create({ url, type: 'popup', width: 380, height: 640, focused: true });
+}
+
+function isType(value: unknown, type: string): boolean {
+  return value !== null && typeof value === 'object' && (value as { type?: unknown }).type === type;
 }
 
 function isAuditRequest(value: unknown): value is AuditRequest {

@@ -160,3 +160,50 @@ footer button {
 .hint[data-state="saved"] {
   color: #1b6e42;
 }
+
+/* No key yet: this is the only thing that matters, so it reads as step one. */
+.apikey[data-missing] {
+  background: #fff3b0;
+  border: 2px solid #0b6b68;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.apikey[data-missing] label[for="apikey"] {
+  font-size: 13px;
+  font-weight: 700;
+  color: #141400;
+}
+
+.getkey {
+  font-size: 12px;
+  color: #0b6b68;
+  font-weight: 600;
+}
+
+.workspace summary {
+  font-size: 11.5px;
+  color: #6b6449;
+  cursor: pointer;
+}
+
+.workspace[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.workspace label {
+  font-size: 12px;
+  color: #6b6449;
+}
+
+.workspace input {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid #b8ac7c;
+  border-radius: 5px;
+  background: #fffef4;
+}

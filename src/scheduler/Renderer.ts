@@ -140,7 +140,7 @@ export class Renderer {
     // Only close the balloon if a suggestion is what is in it. Once the user has
     // opened a panel the balloon belongs to them, and clearing suggestion state
     // must not take their window with it.
-    if (!this.agent.balloon.isLocked) this.agent.balloon.hide();
+    this.hideOwnBalloon();
     if (!suggestion) return;
     this.queue.dismiss(suggestion.kind);
     this.onDismissed?.(suggestion);
@@ -149,7 +149,13 @@ export class Renderer {
   /** User accepted or otherwise resolved the visible suggestion. */
   resolveCurrent(): void {
     this.current = undefined;
-    if (!this.agent.balloon.isLocked) this.agent.balloon.hide();
+    this.hideOwnBalloon();
+  }
+
+  /** Close the balloon only if what is in it is ours: a suggestion or nothing locked. */
+  private hideOwnBalloon(): void {
+    const balloon = this.agent.balloon;
+    if (balloon.showingSuggestion || !balloon.isLocked) balloon.hide();
   }
 
   get visible(): QueuedSuggestion | undefined {

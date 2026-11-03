@@ -89,3 +89,57 @@ describe('balloon lock', () => {
     expect(balloon.el.textContent).toContain('back to normal');
   });
 });
+
+describe('suggestion buttons', () => {
+  /** The balloon a real Renderer sees: suggest() locks it, then a button fires. */
+  function wired() {
+    const anchor = document.createElement('div');
+    document.body.appendChild(anchor);
+    const balloon = new Balloon(anchor);
+    document.body.appendChild(balloon.el);
+    const agent = { balloon, play: () => Promise.resolve(), speak: () => Promise.resolve() };
+    return { balloon, agent: agent as unknown as import('../src/character/Agent').Agent };
+  }
+
+  it('Thanks closes the suggestion it showed', async () => {
+    const { Renderer } = await import('../src/scheduler/Renderer');
+    const { SuggestionQueue } = await import('../src/scheduler/SuggestionQueue');
+    const { BreakpointDetector } = await import('../src/scheduler/BreakpointDetector');
+    const { balloon, agent } = wired();
+    const renderer = new Renderer(agent, new SuggestionQueue(), new BreakpointDetector());
+
+    balloon.suggest('You use "x y z" 2 times close together.', [
+      { label: 'Thanks', primary: true, run: () => renderer.resolveCurrent() },
+    ]);
+    balloon.el.querySelector<HTMLButtonElement>('.mrclippy-btn-primary')?.click();
+
+    expect(balloon.visible).toBe(false);
+  });
+
+  it('Not that closes the suggestion it showed', async () => {
+    const { Renderer } = await import('../src/scheduler/Renderer');
+    const { SuggestionQueue } = await import('../src/scheduler/SuggestionQueue');
+    const { BreakpointDetector } = await import('../src/scheduler/BreakpointDetector');
+    const { balloon, agent } = wired();
+    const renderer = new Renderer(agent, new SuggestionQueue(), new BreakpointDetector());
+
+    balloon.suggest('note', [{ label: 'Not that', run: () => renderer.dismissCurrent() }]);
+    balloon.el.querySelector<HTMLButtonElement>('.mrclippy-btn')?.click();
+
+    expect(balloon.visible).toBe(false);
+  });
+
+  it('still never closes a panel the user opened', async () => {
+    const { Renderer } = await import('../src/scheduler/Renderer');
+    const { SuggestionQueue } = await import('../src/scheduler/SuggestionQueue');
+    const { BreakpointDetector } = await import('../src/scheduler/BreakpointDetector');
+    const { balloon, agent } = wired();
+    const renderer = new Renderer(agent, new SuggestionQueue(), new BreakpointDetector());
+
+    balloon.suggest('note', []);
+    balloon.render(panel());
+    renderer.resolveCurrent();
+
+    expect(balloon.visible).toBe(true);
+  });
+});

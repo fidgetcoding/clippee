@@ -93,6 +93,12 @@ export interface SuggestionRequest {
   readonly confidence: number;
   /** One line, shown in the balloon. */
   readonly text: string;
+  /**
+   * The exact passage this is about, copied from the document. Lets the panel
+   * point at it (select it in the page) and ask for a fix scoped to it.
+   * Absent for document-wide notes like reading level.
+   */
+  readonly anchor?: string;
   /** Collapses duplicates already queued. Defaults to `kind`. */
   readonly dedupeKey?: string;
   /** Overrides the class default. */

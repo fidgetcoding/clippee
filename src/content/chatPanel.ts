@@ -1,78 +1,23 @@
 import type { ChatTurn } from '../agent/types';
+import { fixAllBar, proposalCard, receipt, type CardContext } from './changeCards';
+import { buildChips, buildTitleBar } from './panelChrome';
+import {
+  describeForHistory,
+  fixQuestion,
+  type ChatPanelOptions,
+  type PanelFinding,
+  type Thread,
+} from './chatTypes';
 
-export interface QuickAction {
-  readonly id: string;
-  readonly label: string;
-  readonly question: string;
-}
-
-/** One edit as it actually went, for the receipt under his reply. */
-export interface AgentChange {
-  readonly find: string;
-  readonly replace: string;
-  readonly applied: boolean;
-  /** Plain-English reason, when it did not apply. */
-  readonly reason?: string;
-}
-
-export interface AgentReply {
-  readonly text: string;
-  readonly changes?: readonly AgentChange[];
-}
-
-export interface ChatPanelOptions {
-  readonly onAsk: (question: string, history: readonly ChatTurn[]) => Promise<AgentReply>;
-  /** Reverse the applied changes from one reply. Resolves to a line for the log. */
-  readonly onUndo?: (changes: readonly AgentChange[]) => Promise<string>;
-  /** The structure audit. Runs the local-then-cloud ladder, not a chat turn. */
-  readonly onAudit: () => Promise<string>;
-  /** Local findings, offered as an opening move rather than shoved at the user. */
-  readonly findings: readonly string[];
-  readonly onDismissFinding: (index: number) => void;
-  readonly onClose: () => void;
-  /** "Just let me write" — snooze rather than merely closing. */
-  readonly onSnooze: () => void;
-}
-
-/**
- * Quick-start chips.
- *
- * A blank text box asks the user to invent a question, which is where most
- * people close the thing. These are openings, not a menu — picking one drops its
- * text into the conversation and the chat continues from there, so there is
- * never a mode to back out of.
- */
-export const QUICK_ACTIONS: readonly QuickAction[] = [
-  {
-    id: 'tighten',
-    label: 'Tighten this',
-    question:
-      'Pick the flabbiest paragraph in this document and tighten it in place. Keep my voice and every fact.',
-  },
-  {
-    id: 'summarize',
-    label: 'Sum it up',
-    question: 'Summarise this document in three sentences.',
-  },
-  {
-    id: 'holes',
-    label: "What's missing?",
-    question:
-      'What is missing from this document — an unanswered question, a promise I made and never delivered, a gap in the argument? Name the single biggest one.',
-  },
-  {
-    id: 'structure',
-    label: 'Check my structure',
-    // Handled locally rather than as a chat turn — it runs the signal ladder.
-    question: '',
-  },
-  {
-    id: 'critique',
-    label: 'Be harsh',
-    question:
-      'What is the weakest part of this document and why? Be specific and quote the sentence. Do not soften it.',
-  },
-];
+export {
+  QUICK_ACTIONS,
+  fixQuestion,
+  type AgentChange,
+  type AgentReply,
+  type ChatPanelOptions,
+  type PanelFinding,
+  type QuickAction,
+} from './chatTypes';
 
 /**
  * A conversation, permanently.
@@ -84,27 +29,62 @@ export const QUICK_ACTIONS: readonly QuickAction[] = [
  */
 export class ChatPanel {
   readonly el: HTMLElement;
+  /** The title bar. Dragging it moves the panel. */
+  readonly handle: HTMLElement;
 
-  private readonly log: HTMLElement;
+  private readonly main: Thread;
+  private active: Thread;
+  private readonly fixes = new Map<number, Thread>();
+  private readonly viewport: HTMLElement;
+  private readonly crumb: HTMLElement;
+  private readonly crumbTitle: HTMLElement;
+  private chatList: HTMLElement | undefined;
   private readonly input: HTMLTextAreaElement;
   private readonly send: HTMLButtonElement;
   private readonly chips: HTMLElement;
-  private readonly history: ChatTurn[] = [];
-  private busy = false;
+
+  private readonly cards: CardContext;
 
   constructor(private readonly options: ChatPanelOptions) {
+    this.cards = {
+      options,
+      appendText: (role, text, thread) => this.appendText(role, text, thread),
+      pointsAt: (el, passage) => this.pointsAt(el, passage),
+    };
     this.el = document.createElement('div');
     this.el.className = 'mrclippy-panel';
-    this.el.appendChild(this.buildTitleBar());
+    this.handle = buildTitleBar(options);
+    this.el.appendChild(this.handle);
 
     const body = document.createElement('div');
     body.className = 'mrclippy-body';
 
-    this.log = document.createElement('div');
-    this.log.className = 'mrclippy-log';
-    body.appendChild(this.log);
+    // "← All notes" bar, shown only inside a Fix thread.
+    this.crumb = document.createElement('div');
+    this.crumb.className = 'mrclippy-crumb';
+    this.crumb.hidden = true;
+    const back = document.createElement('button');
+    back.type = 'button';
+    back.className = 'mrclippy-btn mrclippy-back';
+    back.textContent = '\u2190 All notes';
+    back.addEventListener('click', () => this.show(this.main));
+    this.crumbTitle = document.createElement('span');
+    this.crumbTitle.className = 'mrclippy-crumb-title';
+    this.crumb.append(back, this.crumbTitle);
+    body.appendChild(this.crumb);
 
-    this.chips = this.buildChips();
+    this.viewport = document.createElement('div');
+    this.viewport.className = 'mrclippy-viewport';
+    body.appendChild(this.viewport);
+
+    this.main = this.newThread('All notes');
+    this.active = this.main;
+    this.viewport.appendChild(this.main.log);
+
+    this.chips = buildChips(
+      () => void this.runAudit(),
+      (question, label) => void this.submit(question, label),
+    );
     body.appendChild(this.chips);
 
     const form = document.createElement('form');
@@ -148,56 +128,108 @@ export class ChatPanel {
     this.input.focus();
   }
 
-  private buildTitleBar(): HTMLElement {
-    const bar = document.createElement('div');
-    bar.className = 'mrclippy-titlebar';
-
-    const title = document.createElement('span');
-    title.className = 'mrclippy-title';
-    title.textContent = 'Mr. Clippy';
-
-    const controls = document.createElement('span');
-    controls.className = 'mrclippy-titlebtns';
-
-    const quiet = document.createElement('button');
-    quiet.type = 'button';
-    quiet.className = 'mrclippy-titlebtn';
-    quiet.title = 'Just let me write';
-    quiet.setAttribute('aria-label', 'Just let me write');
-    quiet.textContent = '–';
-    quiet.addEventListener('click', () => this.options.onSnooze());
-
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'mrclippy-titlebtn';
-    close.title = 'Close';
-    close.setAttribute('aria-label', 'Close');
-    close.textContent = '✕';
-    close.addEventListener('click', () => this.options.onClose());
-
-    controls.append(quiet, close);
-    bar.append(title, controls);
-    return bar;
-  }
-
-  private buildChips(): HTMLElement {
-    const row = document.createElement('div');
-    row.className = 'mrclippy-chips';
-
-    for (const action of QUICK_ACTIONS) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'mrclippy-chip';
-      chip.textContent = action.label;
-      chip.addEventListener('click', () => {
-        if (action.id === 'structure') void this.runAudit();
-        else void this.submit(action.question, action.label);
-      });
-      row.appendChild(chip);
+  /**
+   * A new chat, listed under "Your questions" on the notes view so it can be
+   * reopened like a fix.
+   */
+  private startChat(title: string): Thread {
+    if (!this.chatList) {
+      const section = document.createElement('div');
+      section.className = 'mrclippy-turn mrclippy-turn-assistant mrclippy-chats';
+      const head = document.createElement('div');
+      head.className = 'mrclippy-receipt-head';
+      head.textContent = 'Your questions';
+      this.chatList = document.createElement('div');
+      this.chatList.className = 'mrclippy-findings';
+      section.append(head, this.chatList);
+      this.main.log.appendChild(section);
     }
 
-    return row;
+    const row = document.createElement('div');
+    row.className = 'mrclippy-finding mrclippy-locatable';
+    const label = document.createElement('span');
+    label.className = 'mrclippy-finding-text';
+    label.textContent = title;
+    const pill = document.createElement('span');
+    pill.className = 'mrclippy-pill';
+    pill.hidden = true;
+    const actions = document.createElement('span');
+    actions.className = 'mrclippy-finding-actions';
+    actions.appendChild(pill);
+    row.append(label, actions);
+
+    const thread = this.newThread(title, (status, tone) => {
+      pill.textContent = status;
+      pill.dataset.tone = tone ?? '';
+      pill.hidden = false;
+    });
+    row.addEventListener('click', () => this.show(thread));
+    this.chatList.appendChild(row);
+    return thread;
   }
+
+  private newThread(title: string, onStatus?: Thread['onStatus']): Thread {
+    const log = document.createElement('div');
+    log.className = 'mrclippy-log';
+    return { log, title, history: [], busy: false, ...(onStatus ? { onStatus } : {}) };
+  }
+
+  /** Swap the visible thread. Each keeps its own scroll position and history. */
+  private show(thread: Thread): void {
+    this.active = thread;
+    this.viewport.replaceChildren(thread.log);
+    const inFix = thread !== this.main;
+    this.crumb.hidden = !inFix;
+    this.crumbTitle.textContent = inFix ? thread.title : '';
+    this.chips.hidden = inFix;
+    this.input.placeholder = inFix
+      ? 'Ask about this fix, or tell me to change it\u2026'
+      : 'Ask a question, or tell me what to change\u2026';
+    this.syncComposer();
+    this.scroll(thread);
+  }
+
+  private syncComposer(): void {
+    this.send.disabled = this.active.busy;
+    this.send.textContent = this.active.busy ? '\u2026' : 'Ask';
+  }
+
+  /**
+   * Open the thread for one finding, starting the fix the first time. Later
+   * clicks just go back to it — the proposals are still there.
+   */
+  private fixThread(
+    index: number,
+    finding: PanelFinding,
+    onStatus: NonNullable<Thread['onStatus']>,
+  ): { thread: Thread; started: Promise<void> | undefined } {
+    const existing = this.fixes.get(index);
+    if (existing) return { thread: existing, started: undefined };
+    const thread = this.newThread(finding.text, onStatus);
+    this.fixes.set(index, thread);
+    thread.drafting = this.submit(fixQuestion(finding), `Fix: ${finding.text}`, thread);
+    return { thread, started: thread.drafting };
+  }
+
+
+  /**
+   * Draft every fix in the background, a few at a time, so by the time the user
+   * reads the list each row can be applied in one click.
+   */
+  private prefetchFixes(starters: (() => Promise<void> | undefined)[]): void {
+    const queue = [...starters];
+    const worker = async (): Promise<void> => {
+      for (let next = queue.shift(); next; next = queue.shift()) await next();
+    };
+    // The first draft runs alone so it writes the document to the prompt cache;
+    // the rest then read it from there instead of paying for it again.
+    const first = queue.shift();
+    void Promise.resolve(first?.()).finally(() => {
+      for (let i = 0; i < Math.min(3, queue.length); i++) void worker();
+    });
+  }
+
+
 
   /** His first turn: what the local checks found, or an invitation. */
   private opening(): void {
@@ -218,12 +250,63 @@ export class ChatPanel {
     const list = document.createElement('div');
     list.className = 'mrclippy-findings';
 
+    const prefetch: (() => Promise<void> | undefined)[] = [];
+    const fixable: (() => { thread: Thread })[] = [];
+
     findings.forEach((finding, index) => {
       const row = document.createElement('div');
       row.className = 'mrclippy-finding';
 
       const text = document.createElement('span');
-      text.textContent = finding;
+      text.className = 'mrclippy-finding-text';
+      text.textContent = finding.text;
+      if (finding.anchor) this.pointsAt(row, finding.anchor);
+
+      const actions = document.createElement('span');
+      actions.className = 'mrclippy-finding-actions';
+
+      if (finding.anchor && this.options.canEdit !== false) {
+        const pill = document.createElement('span');
+        pill.className = 'mrclippy-pill';
+        pill.hidden = true;
+
+        // One click: applies the drafted fix straight from the list.
+        const apply = document.createElement('button');
+        apply.type = 'button';
+        apply.className = 'mrclippy-fix mrclippy-fix-apply';
+        apply.textContent = 'Apply';
+        apply.title = 'Apply this fix';
+        apply.hidden = true;
+
+        const review = document.createElement('button');
+        review.type = 'button';
+        review.className = 'mrclippy-fix mrclippy-review';
+        review.textContent = this.options.prefetch ? 'Review' : 'Fix';
+        review.title = 'See the before and after, or talk it through';
+
+        const onStatus: NonNullable<Thread['onStatus']> = (status, tone) => {
+          pill.textContent = status;
+          pill.dataset.tone = tone ?? '';
+          pill.hidden = tone === 'ready';
+          apply.hidden = tone !== 'ready';
+        };
+        const ensure = () => this.fixThread(index, finding, onStatus);
+
+        apply.addEventListener('click', () => {
+          apply.disabled = true;
+          void ensure().thread.applyAll?.().finally(() => {
+            apply.disabled = false;
+          });
+        });
+        review.addEventListener('click', () => {
+          this.show(ensure().thread);
+          review.textContent = 'Review';
+        });
+        if (this.options.prefetch) prefetch.push(() => ensure().started);
+        fixable.push(ensure);
+
+        actions.append(pill, apply, review);
+      }
 
       const dismiss = document.createElement('button');
       dismiss.type = 'button';
@@ -236,26 +319,56 @@ export class ChatPanel {
         row.remove();
       });
 
-      row.append(text, dismiss);
+      actions.appendChild(dismiss);
+      row.append(text, actions);
       list.appendChild(row);
     });
 
     line.appendChild(list);
-    this.log.appendChild(line);
-    this.scroll();
+    if (fixable.length > 1) line.insertBefore(fixAllBar(this.cards, fixable, this.main), list);
+    this.main.log.appendChild(line);
+    this.scroll(this.main);
+    if (prefetch.length > 0) this.prefetchFixes(prefetch);
   }
 
-  private appendText(role: ChatTurn['role'] | 'error', text: string): HTMLElement {
+  /**
+   * Hovering (or clicking) a note selects its passage in the document, the way
+   * a Docs comment does. Debounced so sweeping the pointer across the list does
+   * not yank the page around.
+   */
+  private pointsAt(el: HTMLElement, passage: string): void {
+    const { onLocate } = this.options;
+    if (!onLocate) return;
+    el.classList.add('mrclippy-locatable');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    el.addEventListener('mouseenter', () => {
+      timer = setTimeout(() => onLocate(passage), 250);
+    });
+    el.addEventListener('mouseleave', () => {
+      if (timer !== undefined) clearTimeout(timer);
+    });
+    el.addEventListener('click', (event) => {
+      if ((event.target as HTMLElement).closest('button')) return;
+      onLocate(passage);
+    });
+  }
+
+
+  private appendText(
+    role: ChatTurn['role'] | 'error',
+    text: string,
+    thread: Thread = this.active,
+  ): HTMLElement {
     const line = document.createElement('div');
     line.className = `mrclippy-turn mrclippy-turn-${role}`;
     line.textContent = text;
-    this.log.appendChild(line);
-    this.scroll();
+    thread.log.appendChild(line);
+    this.scroll(thread);
     return line;
   }
 
-  private scroll(): void {
-    this.log.scrollTop = this.log.scrollHeight;
+  private scroll(thread: Thread = this.active): void {
+    thread.log.scrollTop = thread.log.scrollHeight;
   }
 
   /**
@@ -264,150 +377,90 @@ export class ChatPanel {
    * costs nothing and answers instantly.
    */
   private async runAudit(): Promise<void> {
-    if (this.busy) return;
-    this.busy = true;
-    this.chips.hidden = true;
-    this.send.disabled = true;
+    const thread = this.startChat('Check my structure');
+    this.show(thread);
+    thread.busy = true;
+    thread.onStatus?.('Working\u2026', 'busy');
+    this.syncComposer();
 
-    this.appendText('user', 'Check my structure');
-    const pending = this.appendText('assistant', 'reading the whole thing…');
+    this.appendText('user', 'Check my structure', thread);
+    const pending = this.appendText('assistant', 'reading the whole thing…', thread);
     pending.classList.add('mrclippy-pending');
 
     try {
       const result = await this.options.onAudit();
       pending.classList.remove('mrclippy-pending');
       pending.textContent = result;
+      thread.onStatus?.('Answered', 'done');
     } catch (error: unknown) {
       pending.remove();
-      this.appendText('error', error instanceof Error ? error.message : 'Audit failed.');
+      this.appendText('error', error instanceof Error ? error.message : 'Audit failed.', thread);
     } finally {
-      this.busy = false;
-      this.send.disabled = false;
+      thread.busy = false;
+      thread.history.push({ role: 'user', text: 'Check my structure' });
+      thread.history.push({ role: 'assistant', text: pending.textContent ?? '' });
+      this.syncComposer();
       this.input.focus();
-      this.scroll();
+      this.scroll(thread);
     }
   }
 
-  /**
-   * What he actually changed, under what he said. Every edit is listed, so a
-   * change can never happen without the user being able to see it, and the ones
-   * that failed say why instead of vanishing.
-   */
-  private receipt(changes: readonly AgentChange[]): HTMLElement {
-    const box = document.createElement('div');
-    box.className = 'mrclippy-receipt';
-
-    const applied = changes.filter((c) => c.applied);
-    const head = document.createElement('div');
-    head.className = 'mrclippy-receipt-head';
-    head.textContent =
-      applied.length === changes.length
-        ? `Changed ${applied.length} thing${applied.length === 1 ? '' : 's'}.`
-        : `Changed ${applied.length} of ${changes.length}.`;
-    box.appendChild(head);
-
-    for (const change of changes) {
-      const row = document.createElement('div');
-      row.className = `mrclippy-change${change.applied ? '' : ' mrclippy-change-failed'}`;
-
-      const before = document.createElement('del');
-      before.textContent = clip(change.find);
-      row.appendChild(before);
-
-      if (change.replace.length > 0) {
-        const after = document.createElement('ins');
-        after.textContent = clip(change.replace);
-        row.appendChild(after);
-      }
-
-      if (!change.applied && change.reason) {
-        const why = document.createElement('div');
-        why.className = 'mrclippy-change-why';
-        why.textContent = change.reason;
-        row.appendChild(why);
-      }
-      box.appendChild(row);
-    }
-
-    const { onUndo } = this.options;
-    if (onUndo && applied.length > 0) {
-      const undo = document.createElement('button');
-      undo.type = 'button';
-      undo.className = 'mrclippy-btn';
-      undo.textContent = 'Undo';
-      undo.addEventListener('click', () => {
-        undo.disabled = true;
-        undo.textContent = 'Undoing…';
-        void onUndo(applied)
-          .then((line) => {
-            undo.remove();
-            this.appendText('assistant', line);
-          })
-          .catch((error: unknown) => {
-            undo.disabled = false;
-            undo.textContent = 'Undo';
-            this.appendText('error', error instanceof Error ? error.message : 'Undo failed.');
-          });
-      });
-      box.appendChild(undo);
-    }
-
-    return box;
-  }
 
   /**
    * One turn. `shownAs` lets a quick-action chip show its short label in the
    * transcript while the model receives the full instruction.
    */
-  private async submit(question: string, shownAs?: string): Promise<void> {
-    if (this.busy) return;
+  private async submit(
+    question: string,
+    shownAs?: string,
+    thread: Thread = this.active,
+  ): Promise<void> {
+    // The list stays a list: a question asked from it gets a thread of its own.
+    if (thread === this.main) {
+      thread = this.startChat(shownAs ?? question);
+      this.show(thread);
+    }
+    if (thread.busy) return;
 
-    this.busy = true;
-    this.send.disabled = true;
-    this.send.textContent = '…';
-    this.chips.hidden = true;
+    thread.busy = true;
+    this.syncComposer();
+    thread.onStatus?.('Working\u2026', 'busy');
 
-    this.appendText('user', shownAs ?? question);
-    const pending = this.appendText('assistant', 'thinking…');
+    this.appendText('user', shownAs ?? question, thread);
+    const pending = this.appendText('assistant', 'thinking…', thread);
     pending.classList.add('mrclippy-pending');
 
     try {
-      const reply = await this.options.onAsk(question, [...this.history]);
+      const reply = await this.options.onAsk(question, [...thread.history]);
       pending.classList.remove('mrclippy-pending');
       pending.textContent = reply.text;
-      if (reply.changes && reply.changes.length > 0) {
-        pending.appendChild(this.receipt(reply.changes));
+      if (reply.proposals && reply.proposals.length > 0) {
+        pending.appendChild(proposalCard(this.cards, reply.proposals, thread));
       }
-      this.history.push(
+      if (reply.changes && reply.changes.length > 0) {
+        pending.appendChild(receipt(this.cards, reply.changes, thread));
+      }
+      const ready = reply.proposals?.length ?? 0;
+      thread.onStatus?.(ready > 0 ? `${ready} to review` : 'Answered', ready > 0 ? 'ready' : 'done');
+      thread.history.push(
         { role: 'user', text: question },
         { role: 'assistant', text: describeForHistory(reply) },
       );
     } catch (error: unknown) {
       pending.remove();
-      this.appendText('error', error instanceof Error ? error.message : 'Something went wrong.');
+      this.appendText('error', error instanceof Error ? error.message : 'Something went wrong.', thread);
+      thread.onStatus?.('Failed', 'error');
     } finally {
-      this.busy = false;
-      this.send.disabled = false;
-      this.send.textContent = 'Ask';
-      this.input.focus();
-      this.scroll();
+      thread.busy = false;
+      this.syncComposer();
+      if (thread === this.active) this.input.focus();
+      this.scroll(thread);
     }
   }
 }
 
-/** Long passages are shortened in the receipt; the document has the full text. */
-function clip(text: string, max = 140): string {
-  const flat = text.replace(/\s+/g, ' ').trim();
-  return flat.length > max ? `${flat.slice(0, max - 1)}\u2026` : flat;
-}
 
 /**
  * The model's memory of its own turn. Without the edits in it, a follow-up like
  * "undo the second one" or "now do the same to the intro" has nothing to refer to.
  */
-function describeForHistory(reply: AgentReply): string {
-  const applied = reply.changes?.filter((c) => c.applied) ?? [];
-  if (applied.length === 0) return reply.text;
-  const list = applied.map((c) => `- "${c.find}" -> "${c.replace}"`).join('\n');
-  return `${reply.text}\n\n[Edits I made to the document:\n${list}]`;
-}

@@ -11,6 +11,8 @@ export interface AgentOptions {
   readonly onClick?: () => void;
   /** The X on the character. Dismissing must always be one click away. */
   readonly onDismiss?: () => void;
+  /** After a drag ends, with where he was dropped. Used to remember the spot. */
+  readonly onMoved?: (position: { x: number; y: number }) => void;
 }
 
 /**
@@ -79,13 +81,20 @@ export class Agent {
       options.idleIntervalMs !== undefined ? { intervalMs: options.idleIntervalMs } : {},
     );
 
-    this.position = options.position ?? {
+    const fallback = {
       x: Math.max(16, window.innerWidth - w - 32),
       y: Math.max(16, window.innerHeight - h - 32),
     };
+    // A remembered spot from a bigger window could be off screen; keep him on it.
+    this.position = options.position
+      ? {
+          x: Math.min(Math.max(0, options.position.x), Math.max(0, window.innerWidth - w)),
+          y: Math.min(Math.max(0, options.position.y), Math.max(0, window.innerHeight - h)),
+        }
+      : fallback;
     this.applyPosition();
 
-    this.wireInteraction(options.onClick);
+    this.wireInteraction(options.onClick, options.onMoved);
   }
 
   /** Animation names available in the loaded pack. */
@@ -204,7 +213,10 @@ export class Agent {
     this.root.style.top = `${this.position.y}px`;
   }
 
-  private wireInteraction(onClick?: () => void): void {
+  private wireInteraction(
+    onClick?: () => void,
+    onMoved?: (position: { x: number; y: number }) => void,
+  ): void {
     let moved = false;
 
     this.root.addEventListener('pointerdown', (e: PointerEvent) => {
@@ -234,6 +246,7 @@ export class Agent {
       this.dragOrigin = undefined;
       if (this.root.hasPointerCapture(e.pointerId)) this.root.releasePointerCapture(e.pointerId);
       if (!moved) onClick?.();
+      else onMoved?.({ ...this.position });
     };
 
     this.root.addEventListener('pointerup', release);

@@ -27,6 +27,9 @@ export class Balloon {
   private readonly tip: HTMLElement;
   private hideTimer: ReturnType<typeof setTimeout> | undefined;
   private locked = false;
+  private holdingSuggestion = false;
+  /** Set when the user has dragged the panel somewhere: stop following him. */
+  private pinned: { left: number; top: number } | undefined;
 
   constructor(private readonly anchor: HTMLElement) {
     this.el = document.createElement('div');
@@ -72,6 +75,7 @@ export class Balloon {
    * on an unlocked balloon — which is exactly the bug this closes.
    */
   claim(placeholder: string): void {
+    this.holdingSuggestion = false;
     this.clearHideTimer();
     this.content.replaceChildren(document.createTextNode(placeholder));
     this.locked = true;
@@ -80,6 +84,16 @@ export class Balloon {
 
   unlock(): void {
     this.locked = false;
+  }
+
+  /**
+   * True while the balloon shows a proactive suggestion and nothing else.
+   * `suggest` takes the lock so a queued speak cannot overwrite it, which means
+   * the lock alone cannot tell a suggestion from a panel the user opened. The
+   * renderer reads this to know its own content is safe to close.
+   */
+  get showingSuggestion(): boolean {
+    return this.holdingSuggestion && !this.el.hidden;
   }
 
   get isLocked(): boolean {
@@ -125,6 +139,7 @@ export class Balloon {
     const wrapper = document.createElement('div');
     wrapper.append(body, row);
     this.render(wrapper);
+    this.holdingSuggestion = true;
 
     // Focus the primary action so the keyboard path works without a mouse.
     row.querySelector<HTMLButtonElement>('.mrclippy-btn-primary')?.focus();
@@ -136,6 +151,7 @@ export class Balloon {
    * now the thing the user is interacting with.
    */
   render(node: Node): void {
+    this.holdingSuggestion = false;
     this.clearHideTimer();
     this.content.replaceChildren(node);
     this.locked = true;
@@ -152,6 +168,7 @@ export class Balloon {
   hide(): void {
     this.clearHideTimer();
     this.locked = false;
+    this.holdingSuggestion = false;
     this.el.hidden = true;
   }
 
@@ -172,7 +189,31 @@ export class Balloon {
    * the character. Measured against the viewport, not the document, because the
    * character is fixed-position.
    */
+  /** Hold the balloon at a spot the user chose, instead of beside the character. */
+  pin(left: number, top: number): void {
+    this.pinned = { left, top };
+    this.el.dataset.pinned = '';
+    this.position();
+  }
+
+  unpin(): void {
+    this.pinned = undefined;
+    delete this.el.dataset.pinned;
+  }
+
+  get pinnedAt(): { left: number; top: number } | undefined {
+    return this.pinned;
+  }
+
   position(): void {
+    if (this.pinned) {
+      const b = this.el.getBoundingClientRect();
+      const left = Math.min(Math.max(0, this.pinned.left), Math.max(0, window.innerWidth - b.width));
+      const top = Math.min(Math.max(0, this.pinned.top), Math.max(0, window.innerHeight - 40));
+      this.el.style.left = `${left}px`;
+      this.el.style.top = `${top}px`;
+      return;
+    }
     const side = this.chooseSide();
     const a = this.anchor.getBoundingClientRect();
     const b = this.el.getBoundingClientRect();

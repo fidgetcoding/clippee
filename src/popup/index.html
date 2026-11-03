@@ -11,10 +11,18 @@
       <p id="status">Watching</p>
     </header>
 
-    <section class="apikey">
-      <label for="apikey">Anthropic API key</label>
-      <input type="password" id="apikey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" />
-      <p class="hint" id="apikey-hint">Needed to chat with him. Stored on this machine only — never synced.</p>
+    <section class="apikey" id="apikey-section">
+      <label for="apikey">Step 1 · Your Claude API key</label>
+      <input type="password" id="apikey" placeholder="Paste sk-ant-… here" autocomplete="off" spellcheck="false" />
+      <p class="hint" id="apikey-hint">Needed to chat with him. Stored on this machine only, never synced.</p>
+      <a class="getkey" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get a key →</a>
+
+      <details class="workspace">
+        <summary>Key says it needs a workspace?</summary>
+        <label for="workspace">Workspace ID (optional)</label>
+        <input type="text" id="workspace" placeholder="wrkspc_…" autocomplete="off" spellcheck="false" />
+        <p class="hint">Or make the key inside a workspace in the Console and skip this.</p>
+      </details>
     </section>
 
     <section class="rows">

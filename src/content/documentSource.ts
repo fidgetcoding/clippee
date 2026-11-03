@@ -1,6 +1,8 @@
 import { DocsBridgeClient } from '../docs/bridgeClient';
 import type { EditOutcome } from '../docs/protocol';
+import { locate } from '../docs/match';
 import { FieldEditor } from './fieldEditor';
+import { docsBoxes, type Box } from './highlight';
 
 /**
  * Where Mr. Clippy gets the text he is reasoning about.
@@ -27,6 +29,13 @@ export interface DocumentSource {
    * only passed by undo, which knows where it wrote.
    */
   replace(find: string, text: string, near?: number): Promise<EditOutcome>;
+  /**
+   * Select the first occurrence of `passage` in the page so the user can see
+   * where a note applies — the way clicking a Docs comment selects its text.
+   */
+  select(passage: string): Promise<boolean>;
+  /** On-screen boxes for `passage`, for the loud highlight. Empty if unknown. */
+  boxes(passage: string): Box[];
   dispose?(): void;
 }
 
@@ -53,6 +62,8 @@ export function createDomSource(): DocumentSource {
     explainFailure: () => "There's nothing here I can read.",
     canEdit: () => field.active,
     replace: async (find, text, near) => field.replace(find, text, near),
+    select: async (passage) => field.select(passage),
+    boxes: (passage) => field.boxes(passage),
     dispose: () => field.dispose(),
   };
 }
@@ -96,6 +107,17 @@ export function createDocsSource(): DocumentSource {
     canEdit: () => true,
 
     replace: (find, text, near) => ensureClient().replace(find, text, near),
+
+    select: async (passage) => {
+      const text = await ensureClient().getText();
+      if (!text) return false;
+      // `near: 0` takes the first occurrence instead of refusing a repeat.
+      const hit = locate(text, passage, 0);
+      if ('error' in hit) return false;
+      return ensureClient().setSelection(hit.start, hit.end);
+    },
+
+    boxes: (passage) => docsBoxes(passage),
 
     dispose: () => {
       client?.dispose();

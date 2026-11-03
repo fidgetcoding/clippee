@@ -30,35 +30,50 @@ const MAX_TOKENS = 8_000;
 
 let cached: { key: string; client: Anthropic } | undefined;
 
-function clientFor(apiKey: string): Anthropic {
-  if (cached?.key === apiKey) return cached.client;
+export function clientFor(apiKey: string, workspaceId = ''): Anthropic {
+  const cacheKey = `${apiKey}\n${workspaceId}`;
+  if (cached?.key === cacheKey) return cached.client;
   const client = new Anthropic({
     apiKey,
+    // Header name taken from the API's own 400 for an unscoped key.
+    ...(workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': workspaceId } } : {}),
     // The worker is not a page, but it is not Node either, so the SDK's browser
     // guard trips. The key never enters a page context — see the note above.
     dangerouslyAllowBrowser: true,
   });
-  cached = { key: apiKey, client };
+  cached = { key: cacheKey, client };
   return client;
 }
 
-export async function ask(request: AskRequest, apiKey: string): Promise<AskResponse> {
+export async function ask(
+  request: AskRequest,
+  apiKey: string,
+  workspaceId = '',
+): Promise<AskResponse> {
   if (!apiKey) {
-    return { ok: false, error: 'No API key set. Open the popup and paste one in.', needsKey: true };
+    return { ok: false, error: NO_KEY, needsKey: true };
   }
 
-  const client = clientFor(apiKey);
+  const client = clientFor(apiKey, workspaceId);
 
   // Document first so it holds a stable prefix position across the turns of one
   // conversation; only the trailing question changes.
   const messages: Anthropic.MessageParam[] = [
     {
       role: 'user',
-      content: buildDocumentBlock({
-        document: request.document,
-        findings: request.findings,
-        ...(request.related ? { related: request.related } : {}),
-      }),
+      content: [
+        {
+          type: 'text',
+          text: buildDocumentBlock({
+            document: request.document,
+            findings: request.findings,
+            ...(request.related ? { related: request.related } : {}),
+          }),
+          // The document is identical across every fix drafted for one panel,
+          // so caching here makes each call after the first read it cheaply.
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
     },
     { role: 'assistant', content: 'Got it. What would you like to know about it?' },
     ...request.history.slice(-MAX_HISTORY_TURNS).map(
@@ -143,9 +158,18 @@ export function parseEditCall(input: unknown): { edits: DocumentEdit[]; summary:
  * distinction that matters to the user: a bad key needs them to open the popup,
  * a rate limit needs them to wait, and a network error needs neither.
  */
-function describe(error: unknown): { error: string; needsKey?: boolean } {
+export const NO_KEY = 'I need your Claude API key first. I opened Settings so you can paste it in.';
+
+export function describe(error: unknown): { error: string; needsKey?: boolean } {
   if (error instanceof AuthenticationError) {
-    return { error: 'That API key was rejected. Check it in the popup.', needsKey: true };
+    return { error: 'That API key was rejected. I opened Settings so you can fix it.', needsKey: true };
+  }
+  if (error instanceof APIError && /workspace/i.test(error.message)) {
+    return {
+      error:
+        "That key isn't tied to a workspace. In Settings, paste a key made inside a workspace, or add your workspace ID.",
+      needsKey: true,
+    };
   }
   if (error instanceof PermissionDeniedError) {
     return { error: 'That key lacks permission for the Messages API.', needsKey: true };

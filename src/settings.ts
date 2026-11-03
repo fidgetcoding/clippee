@@ -33,6 +33,11 @@ export interface Settings {
    * shares a DOM with the page it is injected into and must never hold this.
    */
   apiKey: string;
+  /**
+   * Anthropic workspace ID, sent as `anthropic-workspace-id`. Only needed for a
+   * key that is not scoped to a workspace; the API rejects those without it.
+   */
+  workspaceId: string;
 }
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
@@ -44,10 +49,12 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   debugMode: false,
   characterPack: 'clippy',
   apiKey: '',
+  workspaceId: '',
 };
 
 const KEY = 'mrclippy:settings';
 const SECRET_KEY = 'mrclippy:apiKey';
+const WORKSPACE_KEY = 'mrclippy:workspaceId';
 
 export const SNOOZE_DURATIONS_MS = {
   '15 minutes': 15 * 60_000,
@@ -67,6 +74,7 @@ function coerce(raw: unknown): Settings {
     debugMode: value.debugMode ?? DEFAULT_SETTINGS.debugMode,
     characterPack: value.characterPack ?? DEFAULT_SETTINGS.characterPack,
     apiKey: typeof value.apiKey === 'string' ? value.apiKey : '',
+    workspaceId: '',
   };
 }
 
@@ -76,11 +84,12 @@ export async function loadSettings(): Promise<Settings> {
   // not — `storage.sync` is replicated through the browser account.
   const [synced, local] = await Promise.all([
     ext.storage.sync.get(KEY),
-    ext.storage.local.get(SECRET_KEY),
+    ext.storage.local.get([SECRET_KEY, WORKSPACE_KEY]),
   ]);
   const settings = coerce(synced[KEY]);
   const apiKey = (local[SECRET_KEY] ?? '') as string;
-  return { ...settings, apiKey };
+  const workspaceId = (local[WORKSPACE_KEY] ?? '') as string;
+  return { ...settings, apiKey, workspaceId };
 }
 
 export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {
@@ -88,9 +97,12 @@ export async function saveSettings(patch: Partial<Settings>): Promise<Settings> 
   const next: Settings = { ...current, ...patch };
   if (!hasExtensionApis()) return next;
 
-  const { apiKey, ...preferences } = next;
-  await ext.storage.sync.set({ [KEY]: { ...preferences, apiKey: '' } });
+  const { apiKey, workspaceId, ...preferences } = next;
+  await ext.storage.sync.set({ [KEY]: { ...preferences, apiKey: '', workspaceId: '' } });
   if (patch.apiKey !== undefined) await ext.storage.local.set({ [SECRET_KEY]: apiKey });
+  if (patch.workspaceId !== undefined) {
+    await ext.storage.local.set({ [WORKSPACE_KEY]: workspaceId });
+  }
   return next;
 }
 

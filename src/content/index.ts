@@ -14,6 +14,9 @@ import {
   type Settings,
 } from '../settings';
 import { resolveSource } from './documentSource';
+import { isWritingSurface } from './surfaces';
+import { Highlighter } from './highlight';
+import { loadLayout, makePanelMovable, saveLayout } from './layout';
 import { ChatPanel, type AgentChange, type AgentReply } from './chatPanel';
 import type { AskResponse, AuditResponse, ChatTurn, DocumentEdit } from '../agent/types';
 import type { EditFailure } from '../docs/protocol';
@@ -46,8 +49,29 @@ const DEBUG_SILENCE_MS = 3_000;
  * `agent.play()` for a suggestion — the only direct calls are the greeting and
  * an explicit click, both of which the user initiated.
  */
+/** Ask the background to open Settings. It owns the window; we only ask. */
+function openSettings(): void {
+  void ext.runtime.sendMessage({ type: 'mrclippy:open-settings' }).catch(() => undefined);
+}
+
+async function hasApiKey(): Promise<boolean> {
+  try {
+    const reply = (await ext.runtime.sendMessage({ type: 'mrclippy:has-key' })) as
+      | { hasKey?: boolean }
+      | undefined;
+    return reply?.hasKey === true;
+  } catch {
+    return true; // Unknown: don't nag on a guess.
+  }
+}
+
+/** The greeting holds for 7s; the key prompt follows once it has cleared. */
+const KEY_PROMPT_DELAY_MS = 9_000;
+
 async function main(): Promise<void> {
-  if (window.top !== window.self) return;
+  if (!isWritingSurface(location)) return;
+  // Word's editor is an iframe, so frames are allowed there and nowhere else.
+  if (window.top !== window.self && !location.hostname.endsWith('.officeapps.live.com')) return;
   if (!document.body) return;
 
   let settings = await loadSettings();
@@ -65,7 +89,12 @@ async function main(): Promise<void> {
     settings.debugMode ? { minSilenceMs: DEBUG_SILENCE_MS } : {},
   );
 
+  const layout = await loadLayout();
+  let releasePanel: (() => void) | undefined;
+
   const agent = new Agent(pack, {
+    ...(layout.agent ? { position: layout.agent } : {}),
+    onMoved: (position) => void saveLayout({ agent: position }),
     onClick: () => onAgentClick(),
     onDismiss: () => {
       agent.hide();
@@ -113,6 +142,11 @@ async function main(): Promise<void> {
    */
   async function runChecks(): Promise<void> {
     if (renderer.isMuted) return;
+    // Proactive notes are about the writer's own text. On an ordinary page that
+    // means a field they have typed in; the page body is somebody else's prose,
+    // and repeated nav or card titles read as echoes. Clicking him still reviews
+    // the whole page on request.
+    if (!source.canEdit()) return;
     const text = await source.read();
     if (!text || text === lastReviewed) return;
     lastReviewed = text;
@@ -124,8 +158,33 @@ async function main(): Promise<void> {
   /** Where each applied edit landed, so undo can find it again. */
   const landedAt = new WeakMap<AgentChange, number>();
 
+  /**
+   * Fix drafts, keyed by question and the document they were drafted against.
+   * Reopening the panel on unchanged text reuses them instead of paying again.
+   */
+  const drafts = new Map<string, Promise<AgentReply>>();
+
+  function askAgent(question: string, history: readonly ChatTurn[]): Promise<AgentReply> {
+    if (history.length > 0) return askAgentUncached(question, history);
+    return (async () => {
+      const document_ = (await source.read()) ?? '';
+      const key = `${question}\u0000${document_}`;
+      let draft = drafts.get(key);
+      if (!draft) {
+        draft = askAgentUncached(question, history);
+        drafts.set(key, draft);
+        // A failure should be retryable, not remembered.
+        draft.catch(() => drafts.delete(key));
+      }
+      return draft;
+    })();
+  }
+
   /** Send a question to the background worker, which owns the API key. */
-  async function askAgent(question: string, history: readonly ChatTurn[]): Promise<AgentReply> {
+  async function askAgentUncached(
+    question: string,
+    history: readonly ChatTurn[],
+  ): Promise<AgentReply> {
     const document_ = (await source.read()) ?? '';
     const findings = review(document_).map((f) => f.text);
 
@@ -139,14 +198,39 @@ async function main(): Promise<void> {
     })) as AskResponse | undefined;
 
     if (!response) throw new Error('No reply from the background worker. Try reloading the tab.');
-    if (!response.ok) throw new Error(response.error);
+    if (!response.ok) {
+      if (response.needsKey) openSettings();
+      throw new Error(response.error);
+    }
     if (!response.edits || response.edits.length === 0) return { text: response.text };
 
+    // Proposals only. Nothing touches the document until the user applies one.
+    return { text: response.text, proposals: response.edits };
+  }
+
+  /** The user accepted one or more proposals. */
+  async function applyProposals(edits: readonly DocumentEdit[]): Promise<AgentChange[]> {
     void agent.play('Writing');
-    const changes = await applyEdits(response.edits);
+    const changes = await applyEdits(edits);
     // Anything he typed is new text: re-review it at the next seam, not now.
     lastReviewed = '';
-    return { text: response.text, changes };
+    return changes;
+  }
+
+  const highlighter = new Highlighter(host.root);
+
+  /**
+   * Point at a passage: select it (which scrolls the page to it), then paint a
+   * loud box over it once the page has settled. Failure is silent: it is a hover.
+   */
+  async function locatePassage(passage: string): Promise<void> {
+    try {
+      await source.select(passage);
+      await new Promise((r) => setTimeout(r, 250));
+      highlighter.show(source.boxes(passage));
+    } catch {
+      // Nothing to point at — the text may have changed since the check ran.
+    }
   }
 
   /**
@@ -196,7 +280,10 @@ async function main(): Promise<void> {
     })) as AuditResponse | undefined;
 
     if (!response) throw new Error('No reply from the background worker. Try reloading the tab.');
-    if (!response.ok) throw new Error(response.error);
+    if (!response.ok) {
+      if (response.needsKey) openSettings();
+      throw new Error(response.error);
+    }
 
     if (response.findings.length === 0) {
       return 'Structurally it holds up. Nothing promised that you did not deliver.';
@@ -233,8 +320,12 @@ async function main(): Promise<void> {
       const findings = review(text);
 
       panel = new ChatPanel({
-        findings: findings.map((f) => f.text),
+        findings: findings.map((f) => ({ text: f.text, ...(f.anchor ? { anchor: f.anchor } : {}) })),
+        canEdit: source.canEdit(),
+        prefetch: source.canEdit(),
         onAsk: askAgent,
+        onApply: applyProposals,
+        onLocate: locatePassage,
         onUndo: undoChanges,
         onAudit: auditStructure,
         onDismissFinding: (index) => {
@@ -244,6 +335,7 @@ async function main(): Promise<void> {
           void ext.storage.local.set({ [DISMISSAL_KEY]: queue.dismissalState() });
         },
         onClose: closePanel,
+        onSettings: openSettings,
         onSnooze: () => {
           closePanel();
           void agent.play('GoodBye');
@@ -252,12 +344,16 @@ async function main(): Promise<void> {
       });
 
       agent.balloon.render(panel.el);
+      releasePanel?.();
+      releasePanel = makePanelMovable(agent.balloon, panel.handle, (await loadLayout()).panel);
       panel.focus();
       void agent.play(findings.length > 0 ? 'Explain' : 'Congratulate');
     })();
   }
 
   function closePanel(): void {
+    releasePanel?.();
+    releasePanel = undefined;
     agent.balloon.hide();
     panel = undefined;
     renderer.setEngaged(false);
@@ -284,6 +380,29 @@ async function main(): Promise<void> {
   void agent.play('Greeting');
   agent.nudge('It looks like you are writing something. Click me if you want a hand.');
 
+  // First run: right after the greeting, the one setup step that matters.
+  void hasApiKey().then((hasKey) => {
+    if (hasKey) return;
+    setTimeout(() => {
+      if (agent.balloon.isLocked) return; // They already opened something.
+      void agent.play('GetAttention');
+      agent.balloon.suggest(
+        'Before I can help, I need your Claude API key. Paste it in Settings.',
+        [
+          { label: 'Later', run: () => agent.balloon.hide() },
+          {
+            label: 'Open Settings',
+            primary: true,
+            run: () => {
+              agent.balloon.hide();
+              openSettings();
+            },
+          },
+        ],
+      );
+    }, KEY_PROMPT_DELAY_MS);
+  });
+
   const stopWatching = onSettingsChanged((next: Settings) => {
     settings = next;
     renderer.setMuted(isSilenced(settings));
@@ -305,6 +424,7 @@ async function main(): Promise<void> {
     detector.stop();
     renderer.stop();
     source.dispose?.();
+    highlighter.dispose();
     agent.destroy();
     host.destroy();
   }

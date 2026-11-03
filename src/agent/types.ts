@@ -48,7 +48,7 @@ export interface AuditFinding {
 
 export type AuditResponse =
   | { readonly ok: true; readonly findings: readonly AuditFinding[] }
-  | { readonly ok: false; readonly error: string };
+  | { readonly ok: false; readonly error: string; readonly needsKey?: boolean };
 
 export type AskResponse =
   | { readonly ok: true; readonly text: string; readonly edits?: readonly DocumentEdit[] }

@@ -31,15 +31,24 @@ export default defineManifest({
   host_permissions: ['<all_urls>'],
 
   background: isFirefox
-    ? { scripts: ['src/background/index.ts'], type: 'module' }
-    : { service_worker: 'src/background/index.ts', type: 'module' },
+    ? { scripts: ['src/background/serviceWorker.ts'], type: 'module' }
+    : { service_worker: 'src/background/serviceWorker.ts', type: 'module' },
 
   content_scripts: [
     {
-      matches: ['<all_urls>'],
+      // Document editors only. Everywhere else he was noise. `isWritingSurface`
+      // makes the finer cut inside these hosts (Docs' file list, Office's Excel
+      // and PowerPoint frames).
+      matches: [
+        '*://docs.google.com/document/d/*',
+        // Word for the web: the editor is an iframe on this host.
+        'https://*.officeapps.live.com/*',
+        'https://www.notion.so/*',
+        'https://*.notion.site/*',
+      ],
       js: ['src/content/index.ts'],
       run_at: 'document_idle',
-      all_frames: false,
+      all_frames: true,
     },
     {
       // Note the filename: crxjs keys content scripts by basename, so a second

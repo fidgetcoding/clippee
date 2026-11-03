@@ -18,6 +18,9 @@ function el<T extends HTMLElement>(id: string): T {
 }
 
 async function currentHost(): Promise<string | undefined> {
+  // Opened from Clippy as its own window: the page it came from rides along.
+  const passed = new URLSearchParams(location.search).get('host');
+  if (passed) return passed;
   const [tab] = await ext.tabs.query({ active: true, currentWindow: true });
   if (!tab?.url) return undefined;
   try {
@@ -66,6 +69,25 @@ async function main(): Promise<void> {
   const keyField = el<HTMLInputElement>('apikey');
   const keyHint = el('apikey-hint');
   keyField.value = settings.apiKey;
+  const keySection = el('apikey-section');
+  const markMissing = (): void => {
+    keySection.toggleAttribute('data-missing', settings.apiKey.length === 0);
+  };
+  markMissing();
+  if (!settings.apiKey) keyField.focus();
+
+  const workspaceField = el<HTMLInputElement>('workspace');
+  workspaceField.value = settings.workspaceId;
+  if (settings.workspaceId) workspaceField.closest('details')?.setAttribute('open', '');
+  const persistWorkspace = (): void => {
+    const workspaceId = workspaceField.value.trim();
+    if (workspaceId === settings.workspaceId) return;
+    void saveSettings({ workspaceId }).then((next) => {
+      settings = next;
+    });
+  };
+  workspaceField.addEventListener('blur', persistWorkspace);
+  workspaceField.addEventListener('change', persistWorkspace);
 
   // Save on blur rather than per keystroke — writing a partial key on every
   // character would leave a truncated secret in storage between keys.
@@ -75,17 +97,20 @@ async function main(): Promise<void> {
     if (apiKey === settings.apiKey) return;
     void saveSettings({ apiKey }).then((next) => {
       settings = next;
-      keyHint.textContent = apiKey ? 'Saved on this machine.' : 'Cleared.';
+      markMissing();
+      keyHint.textContent = apiKey ? 'Saved. Go ask him something.' : 'Cleared.';
       keyHint.dataset.state = 'saved';
       if (saveTimer !== undefined) clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
-        keyHint.textContent = 'Needed to chat with him. Stored on this machine only — never synced.';
+        keyHint.textContent = 'Needed to chat with him. Stored on this machine only, never synced.';
         delete keyHint.dataset.state;
       }, 2_500);
     });
   };
 
   keyField.addEventListener('blur', persistKey);
+  // A paste is the whole key at once, and the popup can close before blur fires.
+  keyField.addEventListener('paste', () => setTimeout(persistKey, 0));
   keyField.addEventListener('change', persistKey);
 
   const bind = (id: string, key: keyof Settings): void => {

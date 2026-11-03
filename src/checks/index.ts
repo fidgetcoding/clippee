@@ -1,8 +1,9 @@
 import { Relevance, type SuggestionRequest } from '../scheduler/types';
 import { findEchoes } from './echo';
 import { assess } from './readability';
-import { analyseParagraphs, analyseRhythm, repeatedOpeners } from './rhythm';
-import { analyseAdverbs, findStyleIssues } from './style';
+import { analyseParagraphs, repeatedOpeners } from './rhythm';
+import { paragraphs, sentences, syllables, words } from './segment';
+import { findStyleIssues } from './style';
 
 export interface ReviewOptions {
   /** US grade level the prose is aiming at. */
@@ -42,6 +43,7 @@ export function review(text: string, options: ReviewOptions = {}): SuggestionReq
       confidence: echo.wordCount >= 5 ? 0.9 : 0.75,
       text: `You use "${echo.phrase}" ${echo.positions.length} times close together.`,
       dedupeKey: `echo:${echo.phrase}`,
+      ...anchorOf(spanOfWords(trimmed, echo.positions[0] ?? 0, echo.wordCount)),
       payload: echo,
     });
   }
@@ -53,30 +55,27 @@ export function review(text: string, options: ReviewOptions = {}): SuggestionReq
       confidence: 0.8,
       text: `${opener.count} sentences in a row start with "${opener.word}".`,
       dedupeKey: `opener:${opener.word}`,
+      ...anchorOf(clipAnchor(sentences(trimmed)[opener.firstSentenceIndex]?.text)),
       payload: opener,
     });
   }
 
-  const rhythm = analyseRhythm(trimmed);
-  if (rhythm.isMonotonous) {
-    out.push({
-      kind: 'monotonous-rhythm',
-      relevance: Relevance.Document,
-      confidence: 0.65,
-      text: `Every sentence is about ${Math.round(rhythm.meanSentenceWords)} words. Vary one.`,
-      payload: rhythm,
-    });
-  }
 
+  // A grade number alone gives the writer nothing to do. Point at the sentence
+  // doing the most damage instead, so the note can be located and fixed.
   const readability = assess(trimmed, targetGrade);
   if (readability.isHard) {
-    out.push({
-      kind: 'readability',
-      relevance: Relevance.Document,
-      confidence: 0.5 + readability.votesHarder * 0.07,
-      text: `Reading level ~grade ${Math.round(readability.consensusGrade)} — ${readability.votesHarder} of 7 formulas call this hard.`,
-      payload: readability,
-    });
+    const worst = hardestSentence(trimmed);
+    if (worst) {
+      out.push({
+        kind: 'readability',
+        relevance: Relevance.Document,
+        confidence: 0.5 + readability.votesHarder * 0.07,
+        text: `Hardest sentence to read: ${worst.words} words, about grade ${worst.grade}. Splitting it would help most.`,
+        ...anchorOf(clipAnchor(worst.text)),
+        payload: readability,
+      });
+    }
   }
 
   const paragraphBalance = analyseParagraphs(trimmed);
@@ -86,20 +85,11 @@ export function review(text: string, options: ReviewOptions = {}): SuggestionReq
       relevance: Relevance.Document,
       confidence: 0.6,
       text: `Paragraph ${(paragraphBalance.overlong[0] ?? 0) + 1} is more than twice your average length.`,
+      ...anchorOf(clipAnchor(paragraphs(trimmed)[paragraphBalance.overlong[0] ?? 0]?.text)),
       payload: paragraphBalance,
     });
   }
 
-  const adverbs = analyseAdverbs(trimmed);
-  if (adverbs.isHeavy) {
-    out.push({
-      kind: 'adverb-density',
-      relevance: Relevance.Document,
-      confidence: 0.65,
-      text: `${adverbs.count} -ly adverbs in ${adverbs.total} words (${(adverbs.ratio * 100).toFixed(1)}%).`,
-      payload: adverbs,
-    });
-  }
 
   // --- Sentence-local. Harper covers grammar; these are style. --------------
 
@@ -123,11 +113,59 @@ export function review(text: string, options: ReviewOptions = {}): SuggestionReq
           ? `${first.message} ("${first.match}")`
           : `${first.message} — ${findings.length} instances, first: "${first.match}"`,
       dedupeKey: rule,
+      ...anchorOf(trimmed.slice(first.start, first.end)),
       payload: findings,
     });
   }
 
   return out.sort((a, b) => b.confidence - a.confidence);
+}
+
+/**
+ * The sentence with the highest Flesch-Kincaid grade, among sentences long
+ * enough to matter. Short sentences can score high on one long word; those are
+ * not what makes a document hard.
+ */
+export function hardestSentence(
+  text: string,
+): { text: string; words: number; grade: number } | undefined {
+  let best: { text: string; words: number; grade: number } | undefined;
+  for (const sentence of sentences(text)) {
+    const list = words(sentence.text);
+    if (list.length < 12) continue;
+    const syl = list.reduce((sum, w) => sum + syllables(w), 0);
+    const grade = Math.round(0.39 * list.length + 11.8 * (syl / list.length) - 15.59);
+    if (!best || grade > best.grade) best = { text: sentence.text, words: list.length, grade };
+  }
+  return best;
+}
+
+/** Spread-friendly: omit the key entirely when there is nothing to point at. */
+function anchorOf(text: string | undefined): { anchor?: string } {
+  return text && text.trim().length > 0 ? { anchor: text } : {};
+}
+
+/** The first `count` words starting at `start`, as they appear in the text. */
+export function spanOfWords(text: string, start: number, count: number): string | undefined {
+  const pattern = /[\p{L}\p{N}']+/gu;
+  pattern.lastIndex = start;
+  let end = start;
+  for (let i = 0; i < count; i++) {
+    const match = pattern.exec(text);
+    if (!match) return undefined;
+    end = match.index + match[0].length;
+  }
+  return text.slice(start, end);
+}
+
+/**
+ * A long passage only needs its opening to be found again. Cut on a word
+ * boundary so the snippet is still verbatim text.
+ */
+function clipAnchor(text: string | undefined, max = 80): string | undefined {
+  if (!text || text.length <= max) return text;
+  const cut = text.lastIndexOf(' ', max);
+  return text.slice(0, cut > 20 ? cut : max);
 }
 
 export { findEchoes } from './echo';

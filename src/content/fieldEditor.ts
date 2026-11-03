@@ -92,6 +92,46 @@ export class FieldEditor {
     return this.read() !== undefined;
   }
 
+  /** Select the first occurrence of `passage` and scroll it into view. */
+  select(passage: string): boolean {
+    const field = this.field;
+    const current = this.read();
+    if (!field || current === undefined) return false;
+    const hit = locate(current, passage, 0);
+    if ('error' in hit) return false;
+
+    if (isPlainField(field)) {
+      field.focus({ preventScroll: true });
+      field.setSelectionRange(hit.start, hit.end);
+      field.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return true;
+    }
+    const range = rangeAt(field, hit.start, hit.end);
+    if (!range) return false;
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    range.startContainer.parentElement?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    return true;
+  }
+
+  /** Screen boxes for `passage` in a rich-text field. Plain fields cannot say. */
+  boxes(passage: string): { left: number; top: number; width: number; height: number }[] {
+    const field = this.field;
+    const current = this.read();
+    if (!field || current === undefined || isPlainField(field)) return [];
+    const hit = locate(current, passage, 0);
+    if ('error' in hit) return [];
+    const range = rangeAt(field, hit.start, hit.end);
+    if (!range) return [];
+    return [...range.getClientRects()].map((r) => ({
+      left: r.left,
+      top: r.top,
+      width: r.width,
+      height: r.height,
+    }));
+  }
+
   replace(find: string, text: string, near?: number): EditOutcome {
     const field = this.field;
     const current = this.read();

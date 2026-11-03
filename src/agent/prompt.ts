@@ -52,8 +52,9 @@ How to write edits:
 - To delete, replace with an empty string.
 - Plain text only. No markdown, no asterisks, no bullet characters. A new paragraph is a single newline.
 - Several separate changes are several edits in one call, in document order.
+- The user sees every edit as its own before/after proposal and accepts or skips each one, in any order. So each edit must stand alone: no two edits may touch overlapping text, and none may depend on another being applied. Prefer several sentence-sized edits over one paragraph-sized edit.
 
-After the tool call, the summary is what the user reads in the balloon: one short sentence saying what you changed.`;
+After the tool call, the summary is what the user reads above the proposals: one short sentence saying what you propose.`;
 
 export const EDIT_TOOL = {
   name: 'edit_document',
