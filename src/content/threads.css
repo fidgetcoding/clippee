@@ -1,0 +1,189 @@
+/**
+ * Inside a thread: "You:" boxes, his replies as plain text, proposals in a
+ * "Proposed changes" group with Apply/Skip on each, receipts with a tick or a
+ * cross per change, and the inline diff they all share.
+ */
+
+/* ---------- turns ---------- */
+
+.mrclippy-turn {
+  padding: 4px 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.mrclippy-turn-user {
+  margin: 4px 0 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  background: #fff;
+  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #404040, inset -2px -2px #dfdfdf;
+}
+
+.mrclippy-turn-user::before {
+  content: "You: ";
+  font-weight: 700;
+  color: var(--mc-navy);
+}
+
+.mrclippy-turn-error {
+  color: var(--mc-why);
+}
+
+.mrclippy-pending {
+  font-style: italic;
+  color: var(--mc-mute);
+}
+
+/* ---------- proposals ---------- */
+
+.mrclippy-proposals {
+  white-space: normal;
+}
+
+.mrclippy-proposals .mrclippy-grp {
+  margin-top: 14px;
+}
+
+.mrclippy-proposal {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  column-gap: 9px;
+  align-items: start;
+  padding: 7px 6px;
+  border-bottom: 1px dotted var(--mc-div);
+}
+
+.mrclippy-well > :last-child {
+  border-bottom: 0;
+}
+
+.mrclippy-proposal .mrclippy-bul {
+  margin-top: 2px;
+}
+
+.mrclippy-proposal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mrclippy-proposal-actions .mrclippy-btn {
+  width: 52px;
+}
+
+.mrclippy-proposal-skipped {
+  opacity: 0.45;
+}
+
+.mrclippy-proposal-busy {
+  opacity: 0.6;
+}
+
+.mrclippy-apply-all {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 9px;
+}
+
+/* ---------- receipts ---------- */
+
+.mrclippy-receipt {
+  white-space: normal;
+}
+
+.mrclippy-rc {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  column-gap: 9px;
+  padding: 5px 6px;
+  font-size: 12.5px;
+  border-bottom: 1px dotted var(--mc-div);
+}
+
+.mrclippy-receipt > .mrclippy-rc:last-of-type {
+  border-bottom: 0;
+}
+
+.mrclippy-rc .mrclippy-ic {
+  margin-top: 1px;
+}
+
+.mrclippy-change-failed {
+  color: var(--mc-mute);
+  background: #f3efd2;
+}
+
+.mrclippy-change-failed .mrclippy-diff del,
+.mrclippy-change-failed .mrclippy-diff ins,
+.mrclippy-change-failed .mrclippy-diff-context {
+  color: var(--mc-mute);
+}
+
+.mrclippy-change-failed .mrclippy-diff ins {
+  font-weight: 400;
+  outline-color: #b0ab90;
+}
+
+.mrclippy-change-why {
+  margin-top: 2px;
+}
+
+.mrclippy-receipt-toggle {
+  margin: 3px 0 4px 31px;
+}
+
+.mrclippy-turn > .mrclippy-receipt {
+  margin-top: 6px;
+}
+
+.mrclippy-receipt-undone .mrclippy-diff {
+  opacity: 0.5;
+}
+
+/* ---------- inline diff ---------- */
+
+.mrclippy-diff {
+  line-height: 1.5;
+}
+
+.mrclippy-diff-context {
+  color: var(--mc-mute);
+}
+
+.mrclippy-diff del {
+  color: #800000;
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+.mrclippy-diff ins {
+  padding: 0 2px;
+  font-weight: 700;
+  color: var(--mc-navy);
+  text-decoration: none;
+  background: #fff;
+  outline: 1px dotted var(--mc-navy);
+}
+
+.mrclippy-diff ins:has(> .mrclippy-diff-break:only-child) {
+  padding: 0;
+  outline: 0;
+  background: none;
+}
+
+.mrclippy-diff-break {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px 0 3px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  vertical-align: 1px;
+  color: var(--mc-navy);
+  background: #fff;
+  outline: 1px dotted var(--mc-navy);
+}

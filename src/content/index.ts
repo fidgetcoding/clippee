@@ -17,7 +17,7 @@ import { resolveSource } from './documentSource';
 import { isWritingSurface } from './surfaces';
 import { Highlighter } from './highlight';
 import { loadLayout, makePanelMovable, saveLayout } from './layout';
-import { ChatPanel, type AgentChange, type AgentReply } from './chatPanel';
+import { ChatPanel, docTitleFrom, type AgentChange, type AgentReply } from './chatPanel';
 import type { AskResponse, AuditResponse, ChatTurn, DocumentEdit } from '../agent/types';
 import type { EditFailure } from '../docs/protocol';
 
@@ -33,9 +33,6 @@ const DISMISSAL_KEY = 'mrclippy:dismissals';
 
 /** Clicking the X sends him away for the rest of the working day. */
 const HIDE_DURATION_MS = 8 * 60 * 60_000;
-
-/** "Just let me write" — quiet for an hour, but he stays on screen. */
-const SNOOZE_DURATION_MS = 60 * 60_000;
 
 /** Test mode drops both gates so suggestions surface immediately. */
 const DEBUG_GAP_MS = 5_000;
@@ -118,12 +115,13 @@ async function main(): Promise<void> {
         },
         {
           label: 'Show me',
+          primary: true,
           run: () => {
             renderer.resolveCurrent();
             openPanel();
           },
         },
-        { label: 'Thanks', primary: true, run: () => renderer.resolveCurrent() },
+        { label: 'Thanks', run: () => renderer.resolveCurrent() },
       ]);
     },
     onDismissed: () => {
@@ -319,8 +317,14 @@ async function main(): Promise<void> {
 
       const findings = review(text);
 
+      const docTitle = docTitleFrom(document.title);
       panel = new ChatPanel({
-        findings: findings.map((f) => ({ text: f.text, ...(f.anchor ? { anchor: f.anchor } : {}) })),
+        findings: findings.map((f) => ({
+          text: f.text,
+          kind: f.kind,
+          ...(f.anchor ? { anchor: f.anchor } : {}),
+        })),
+        ...(docTitle ? { docTitle } : {}),
         canEdit: source.canEdit(),
         prefetch: source.canEdit(),
         onAsk: askAgent,
@@ -334,13 +338,9 @@ async function main(): Promise<void> {
           queue.dismiss(finding.kind);
           void ext.storage.local.set({ [DISMISSAL_KEY]: queue.dismissalState() });
         },
+        // Escape. Snooze lives in Settings now, not on the panel.
         onClose: closePanel,
         onSettings: openSettings,
-        onSnooze: () => {
-          closePanel();
-          void agent.play('GoodBye');
-          void saveSettings({ snoozeUntil: Date.now() + SNOOZE_DURATION_MS });
-        },
       });
 
       agent.balloon.render(panel.el);
@@ -399,6 +399,7 @@ async function main(): Promise<void> {
             },
           },
         ],
+        'Mr. Clippy',
       );
     }, KEY_PROMPT_DELAY_MS);
   });

@@ -1,4 +1,6 @@
 import styles from './styles.css?inline';
+import panelStyles from './panel.css?inline';
+import threadStyles from './threads.css?inline';
 
 const HOST_ID = 'mrclippy-host';
 
@@ -30,7 +32,7 @@ export function mountHost(): Host {
   const root = container.attachShadow({ mode: 'open' });
 
   const sheet = document.createElement('style');
-  sheet.textContent = `${styles}\n.mrclippy-agent,.mrclippy-balloon{pointer-events:auto;}`;
+  sheet.textContent = `${styles}\n${panelStyles}\n${threadStyles}\n.mrclippy-agent,.mrclippy-balloon{pointer-events:auto;}`;
   root.appendChild(sheet);
 
   document.documentElement.appendChild(container);

@@ -1,0 +1,472 @@
+/**
+ * The panel: one tall speech-balloon sheet beside him, in the Windows 98
+ * idiom. Navy ribbons, a big navy heading, etched group boxes holding sunken
+ * white lists, gray bevel buttons with teal only on the primary action. The
+ * sheet shell itself (bubble, tail, placement padding) is in styles.css.
+ */
+
+.mrclippy-balloon.mrclippy-balloon-panel {
+  width: 425px;
+  max-width: none;
+  min-width: 300px;
+  min-height: 240px;
+  max-height: calc(100vh - 16px);
+  resize: both;
+  overflow: hidden;
+}
+
+.mrclippy-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mrclippy-titlebar {
+  flex: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mrclippy-balloon-panel .mrclippy-titlebar {
+  cursor: move;
+  touch-action: none;
+}
+
+.mrclippy-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mrclippy-titlebtns {
+  display: flex;
+  gap: 4px;
+  font-weight: 400;
+}
+
+.mrclippy-rib .mrclippy-btn-sm {
+  height: 18px;
+  padding: 0 6px;
+  font-size: 11.5px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.mrclippy-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mrclippy-viewport {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mrclippy-log {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.mrclippy-panel[data-view="thread"] .mrclippy-log {
+  padding: 6px 12px 10px;
+}
+
+.mrclippy-panel[data-view="thread"] .mrclippy-log:has(.mrclippy-receipt-screen) {
+  padding: 0;
+}
+
+/* ---------- heading, Fix all ---------- */
+
+.mrclippy-hd {
+  padding: 6px 12px 2px;
+}
+
+.mrclippy-big {
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 700;
+  color: var(--mc-navy);
+}
+
+.mrclippy-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--mc-mute);
+}
+
+.mrclippy-sub b {
+  color: var(--mc-ink);
+  font-weight: 700;
+}
+
+.mrclippy-tally[hidden] {
+  display: none;
+}
+
+.mrclippy-fixall {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px 2px;
+}
+
+.mrclippy-fixall-hint {
+  font-size: 12px;
+  color: var(--mc-mute);
+  text-wrap: pretty;
+}
+
+.mrclippy-say {
+  margin-top: 6px;
+  font-size: 12.5px;
+}
+
+/* ---------- group boxes and wells ---------- */
+
+.mrclippy-gp {
+  padding: 2px 10px 9px;
+}
+
+.mrclippy-grp {
+  position: relative;
+  margin-top: 9px;
+  padding: 13px 8px 8px;
+  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #fff, inset -2px -2px #808080;
+}
+
+.mrclippy-lg {
+  position: absolute;
+  top: -8px;
+  left: 8px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  background: var(--mc-bal);
+}
+
+.mrclippy-grp-rt {
+  position: absolute;
+  top: -9px;
+  right: 8px;
+  padding: 0 4px;
+  background: var(--mc-bal);
+}
+
+.mrclippy-well {
+  padding: 2px;
+  background: #fff;
+  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #404040, inset -2px -2px #dfdfdf;
+}
+
+.mrclippy-lvh {
+  display: grid;
+  grid-template-columns: 1fr 78px;
+}
+
+.mrclippy-lvh span {
+  height: 18px;
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 16px;
+  background: var(--mc-face);
+  box-shadow: inset -1px -1px #404040, inset 1px 1px #fff, inset -2px -2px #808080;
+}
+
+.mrclippy-chk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font-family: var(--mc-font);
+  font-size: 12px;
+  color: var(--mc-ink);
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.mrclippy-chk i {
+  position: relative;
+  flex: none;
+  width: 13px;
+  height: 13px;
+  background: #fff;
+  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #404040, inset -2px -2px #dfdfdf;
+}
+
+.mrclippy-chk[aria-pressed="true"] i::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1.5px;
+  width: 3px;
+  height: 7px;
+  border: solid #000;
+  border-width: 0 2px 2px 0;
+  transform: rotate(40deg);
+}
+
+.mrclippy-chk:focus-visible {
+  outline: 1px dotted #000;
+}
+
+/* ---------- note rows ---------- */
+
+.mrclippy-nr {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px 1fr 78px;
+  column-gap: 7px;
+  padding: 4px 4px 5px 6px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--mc-div);
+}
+
+.mrclippy-nr:last-child {
+  border-bottom: 0;
+}
+
+.mrclippy-nr-ic {
+  margin-top: 1px;
+}
+
+.mrclippy-ic {
+  display: block;
+}
+
+.mrclippy-nr-tx {
+  text-wrap: pretty;
+}
+
+.mrclippy-nr-tx b {
+  font-weight: 700;
+}
+
+.mrclippy-nr-st {
+  padding-right: 2px;
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--mc-mute);
+}
+
+.mrclippy-nr-ac {
+  grid-column: 2 / 4;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.mrclippy-nr-ac[hidden],
+.mrclippy-bar[hidden] {
+  display: none;
+}
+
+.mrclippy-nr-note {
+  color: var(--mc-mute);
+}
+
+.mrclippy-why,
+.mrclippy-nr-note.mrclippy-why {
+  color: var(--mc-why);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.mrclippy-nr[data-state="failed"] .mrclippy-nr-ac {
+  align-items: flex-start;
+}
+
+.mrclippy-nr[data-state="applied"] .mrclippy-nr-tx,
+.mrclippy-nr[data-state="applied"] .mrclippy-nr-st,
+.mrclippy-nr[data-state="failed"] .mrclippy-nr-tx,
+.mrclippy-nr[data-state="skipped"] .mrclippy-nr-tx {
+  color: var(--mc-mute);
+}
+
+.mrclippy-nr[data-state="failed"] .mrclippy-nr-st {
+  color: var(--mc-why);
+}
+
+.mrclippy-nr .mrclippy-bul {
+  margin-top: 2px;
+}
+
+/* "Never show this kind again": a quiet link, revealed on the row it is about. */
+.mrclippy-dismiss {
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  padding: 0;
+  font-family: var(--mc-font);
+  font-size: 11px;
+  color: var(--mc-mute);
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.mrclippy-nr:hover .mrclippy-dismiss,
+.mrclippy-dismiss:focus-visible {
+  opacity: 1;
+}
+
+.mrclippy-dismiss[hidden] {
+  display: none;
+}
+
+.mrclippy-locatable {
+  cursor: pointer;
+}
+
+.mrclippy-locatable:hover {
+  background: #fff7c2;
+  outline: 1px dotted #000;
+  outline-offset: -1px;
+}
+
+/* ---------- hide fixed ---------- */
+
+.mrclippy-hidden-note {
+  display: none;
+  padding: 5px 6px;
+  font-size: 12px;
+  color: var(--mc-mute);
+  border-bottom: 1px solid var(--mc-div);
+}
+
+.mrclippy-panel.mrclippy-hide-fixed .mrclippy-notes [data-fixed],
+.mrclippy-receipt-screen.mrclippy-hide-fixed [data-fixed] {
+  display: none;
+}
+
+.mrclippy-panel.mrclippy-hide-fixed .mrclippy-notes .mrclippy-hidden-note:not(:empty),
+.mrclippy-receipt-screen.mrclippy-hide-fixed .mrclippy-hidden-note {
+  display: block;
+}
+
+/* ---------- your questions ---------- */
+
+.mrclippy-q {
+  display: grid;
+  grid-template-columns: 13px 1fr auto;
+  column-gap: 9px;
+  align-items: center;
+  padding: 4px 6px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--mc-div);
+  cursor: pointer;
+}
+
+.mrclippy-q:last-child {
+  border-bottom: 0;
+}
+
+.mrclippy-q:hover {
+  background: #fff7c2;
+}
+
+.mrclippy-q:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -1px;
+}
+
+.mrclippy-qt {
+  color: var(--mc-navy);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mrclippy-q-st {
+  font-size: 12px;
+  color: var(--mc-mute);
+}
+
+.mrclippy-q[data-state="working"] .mrclippy-q-st {
+  color: var(--mc-ink);
+}
+
+/* ---------- ask ---------- */
+
+.mrclippy-ask-area {
+  flex: none;
+}
+
+.mrclippy-ask-area[hidden],
+.mrclippy-chips[hidden],
+.mrclippy-foot[hidden] {
+  display: none;
+}
+
+.mrclippy-ask-in {
+  padding: 9px 12px 10px;
+}
+
+.mrclippy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0 0 8px;
+}
+
+.mrclippy-composer {
+  display: flex;
+  gap: 6px;
+}
+
+.mrclippy-input {
+  flex: 1;
+  height: 44px;
+  padding: 6px 8px;
+  font-family: var(--mc-font);
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--mc-ink);
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #404040, inset -2px -2px #dfdfdf;
+  resize: none;
+}
+
+.mrclippy-input::placeholder {
+  color: #6b6b6b;
+}
+
+.mrclippy-input:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+
+.mrclippy-send {
+  height: 44px;
+  min-width: 62px;
+}
+
+/* ---------- foot (Undo all / Redo) ---------- */
+
+.mrclippy-foot {
+  flex: none;
+}
+
+.mrclippy-foot-bar {
+  display: flex;
+  gap: 6px;
+  padding: 9px 12px 11px;
+  border-top: 1px solid var(--mc-hair);
+}

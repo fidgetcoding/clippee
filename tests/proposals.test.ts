@@ -16,7 +16,6 @@ function panel(overrides: Partial<ConstructorParameters<typeof ChatPanel>[0]> = 
     onAudit: async () => '',
     onDismissFinding: () => {},
     onClose: () => {},
-    onSnooze: () => {},
     onSettings: () => {},
     ...overrides,
   });
@@ -113,12 +112,12 @@ describe('one fix at a time', () => {
     await flush();
     // Inside thread 1: one proposal, a back button, and not the list.
     expect(p.el.querySelectorAll('.mrclippy-proposal')).toHaveLength(1);
-    expect(p.el.querySelector('.mrclippy-crumb')?.hasAttribute('hidden')).toBe(false);
+    expect(back()?.hidden).toBe(false);
     expect(p.el.querySelector('.mrclippy-findings')).toBeNull();
 
     back()?.click();
     expect(p.el.querySelector('.mrclippy-findings')).not.toBeNull();
-    expect(p.el.querySelector('.mrclippy-pill')?.textContent).toBe('1 to review');
+    expect(p.el.querySelector('.mrclippy-nr-st')?.textContent).toBe('1 change');
 
     fixes()[1]?.click();
     await flush();
@@ -198,9 +197,16 @@ describe('one fix at a time', () => {
     for (let i = 0; i < 6; i++) await flush();
 
     expect(onApply).toHaveBeenCalledTimes(2);
-    expect(p.el.querySelector('.mrclippy-fixall')?.textContent).toContain('Applied 2 changes');
-    const undo = p.el.querySelector<HTMLButtonElement>('.mrclippy-fixall .mrclippy-receipt .mrclippy-btn');
-    expect(undo?.textContent).toBe('Undo all');
+    // The result is a screen of its own, with one Undo all at its foot.
+    expect(p.el.querySelector('.mrclippy-receipt-screen .mrclippy-big')?.textContent).toBe('Applied 2 of 2');
+    expect(p.el.querySelector('.mrclippy-title')?.textContent).toBe('Fix all');
+    const foot = [...p.el.querySelectorAll<HTMLButtonElement>('.mrclippy-foot .mrclippy-btn')];
+    expect(foot.map((b) => b.textContent)).toEqual(['Undo all', 'Redo']);
+    expect(foot[1]?.disabled).toBe(true);
+
+    // Back on the notes, both rows read Applied and the tally says so.
+    p.el.querySelector<HTMLButtonElement>('.mrclippy-back')?.click();
+    expect(p.el.querySelector('.mrclippy-tally')?.textContent).toBe('2 applied');
   });
 
   it('a question asked from the list opens its own chat, listed for later', async () => {
@@ -210,7 +216,7 @@ describe('one fix at a time', () => {
     p.el.querySelector('form')?.requestSubmit();
     await flush();
     await flush();
-    expect(p.el.querySelector('.mrclippy-crumb')?.hasAttribute('hidden')).toBe(false);
+    expect(p.el.querySelector<HTMLButtonElement>('.mrclippy-back')?.hidden).toBe(false);
     expect(p.el.textContent).toContain('answer to is my thesis clear?');
 
     p.el.querySelector<HTMLButtonElement>('.mrclippy-back')?.click();

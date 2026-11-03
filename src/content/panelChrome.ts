@@ -1,45 +1,109 @@
 import { QUICK_ACTIONS, type ChatPanelOptions } from './chatTypes';
 
-/** The panel's fixed parts: the Win98 title bar and the quick-action chips. */
+/**
+ * The panel's fixed parts, in the Windows 98 idiom: navy gradient ribbons,
+ * etched group boxes, sunken wells, bevel buttons. Small builders so the
+ * panel and the cards read as layout, not DOM plumbing.
+ */
 
-export function buildTitleBar(options: ChatPanelOptions): HTMLElement {
-  const bar = document.createElement('div');
-  bar.className = 'mrclippy-titlebar';
+export function button(label: string, className = ''): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = `mrclippy-btn${className ? ` ${className}` : ''}`;
+  b.textContent = label;
+  return b;
+}
+
+/** A navy section ribbon ("Ask Mr. Clippy"). */
+export function ribbon(text: string): HTMLElement {
+  const rib = document.createElement('div');
+  rib.className = 'mrclippy-rib';
+  rib.textContent = text;
+  return rib;
+}
+
+export interface TitleBar {
+  readonly el: HTMLElement;
+  readonly back: HTMLButtonElement;
+  readonly title: HTMLElement;
+  readonly settings: HTMLButtonElement;
+}
+
+/**
+ * The top ribbon, which is also the drag handle. On the notes it reads
+ * "Mr. Clippy" with Settings as its only control; inside a thread it reads
+ * "< Notes" and the thread's title. There is deliberately no close button:
+ * clicking him or pressing Escape closes the panel.
+ */
+export function buildTitleBar(options: ChatPanelOptions): TitleBar {
+  const el = document.createElement('div');
+  el.className = 'mrclippy-titlebar mrclippy-rib mrclippy-rib-first';
+
+  const back = button('< Notes', 'mrclippy-btn-sm mrclippy-back');
+  back.hidden = true;
 
   const title = document.createElement('span');
   title.className = 'mrclippy-title';
   title.textContent = 'Mr. Clippy';
 
-  const controls = document.createElement('span');
-  controls.className = 'mrclippy-titlebtns';
+  const right = document.createElement('span');
+  right.className = 'mrclippy-titlebtns';
+  const settings = button('Settings', 'mrclippy-btn-sm mrclippy-titlebtn-settings');
+  settings.title = 'Settings: API key, mute, snooze';
+  settings.addEventListener('click', () => options.onSettings());
+  right.appendChild(settings);
 
-  const settingsBtn = document.createElement('button');
-  settingsBtn.type = 'button';
-  settingsBtn.className = 'mrclippy-titlebtn mrclippy-titlebtn-settings';
-  settingsBtn.title = 'Settings: API key, mute, snooze';
-  settingsBtn.setAttribute('aria-label', 'Settings: API key, mute, snooze');
-  settingsBtn.textContent = 'Settings';
-  settingsBtn.addEventListener('click', () => options.onSettings());
+  el.append(back, title, right);
+  return { el, back, title, settings };
+}
 
-  const quiet = document.createElement('button');
-  quiet.type = 'button';
-  quiet.className = 'mrclippy-titlebtn';
-  quiet.title = 'Just let me write';
-  quiet.setAttribute('aria-label', 'Just let me write');
-  quiet.textContent = '–';
-  quiet.addEventListener('click', () => options.onSnooze());
+/** A Win98 checkbox drawn as a toggle button, so it styles the same everywhere. */
+export function checkbox(label: string, onChange: (on: boolean) => void): {
+  el: HTMLButtonElement;
+  setLabel(text: string): void;
+} {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'mrclippy-chk';
+  el.setAttribute('aria-pressed', 'false');
+  const box = document.createElement('i');
+  const text = document.createElement('span');
+  text.textContent = label;
+  el.append(box, text);
+  el.addEventListener('click', () => {
+    const on = el.getAttribute('aria-pressed') !== 'true';
+    el.setAttribute('aria-pressed', String(on));
+    onChange(on);
+  });
+  return { el, setLabel: (t) => (text.textContent = t) };
+}
 
-  const close = document.createElement('button');
-  close.type = 'button';
-  close.className = 'mrclippy-titlebtn';
-  close.title = 'Close';
-  close.setAttribute('aria-label', 'Close');
-  close.textContent = '✕';
-  close.addEventListener('click', () => options.onClose());
-
-  controls.append(settingsBtn, quiet, close);
-  bar.append(title, controls);
-  return bar;
+/**
+ * An etched group box with its label on the border and, optionally, a control
+ * on the right of the border (the hide-fixed checkbox). The well inside is the
+ * sunken white list.
+ */
+export function groupBox(label: string, right?: HTMLElement): {
+  box: HTMLElement;
+  legend: HTMLElement;
+  well: HTMLElement;
+} {
+  const box = document.createElement('div');
+  box.className = 'mrclippy-grp';
+  const legend = document.createElement('span');
+  legend.className = 'mrclippy-lg';
+  legend.textContent = label;
+  box.appendChild(legend);
+  if (right) {
+    const slot = document.createElement('span');
+    slot.className = 'mrclippy-grp-rt';
+    slot.appendChild(right);
+    box.appendChild(slot);
+  }
+  const well = document.createElement('div');
+  well.className = 'mrclippy-well';
+  box.appendChild(well);
+  return { box, legend, well };
 }
 
 export function buildChips(
@@ -50,10 +114,7 @@ export function buildChips(
   row.className = 'mrclippy-chips';
 
   for (const action of QUICK_ACTIONS) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'mrclippy-chip';
-    chip.textContent = action.label;
+    const chip = button(action.label, 'mrclippy-btn-sm mrclippy-chip');
     chip.addEventListener('click', () => {
       if (action.id === 'structure') onAudit();
       else onAsk(action.question, action.label);
@@ -62,4 +123,37 @@ export function buildChips(
   }
 
   return row;
+}
+
+export interface AskArea {
+  readonly el: HTMLElement;
+  readonly form: HTMLFormElement;
+  readonly input: HTMLTextAreaElement;
+  readonly send: HTMLButtonElement;
+}
+
+/** "Ask Mr. Clippy": the ribbon, the chips under it, a sunken box and a big Ask. */
+export function buildAskArea(chips: HTMLElement): AskArea {
+  const el = document.createElement('div');
+  el.className = 'mrclippy-ask-area';
+
+  const inner = document.createElement('div');
+  inner.className = 'mrclippy-ask-in';
+
+  const form = document.createElement('form');
+  form.className = 'mrclippy-composer';
+
+  const input = document.createElement('textarea');
+  input.className = 'mrclippy-input';
+  input.rows = 2;
+  input.placeholder = 'Ask a question, or tell me what to change…';
+  input.setAttribute('aria-label', 'Ask Mr. Clippy');
+
+  const send = button('Ask', 'mrclippy-btn-default mrclippy-send');
+  send.type = 'submit';
+
+  form.append(input, send);
+  inner.append(chips, form);
+  el.append(ribbon('Ask Mr. Clippy'), inner);
+  return { el, form, input, send };
 }

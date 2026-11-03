@@ -1,4 +1,12 @@
-export type BalloonSide = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+export type BalloonSide =
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right'
+  /** Beside the character: the balloon sits to his left, the tail points right. */
+  | 'left'
+  /** Beside the character: the balloon sits to his right, the tail points left. */
+  | 'right';
 
 export interface BalloonAction {
   readonly label: string;
@@ -8,6 +16,31 @@ export interface BalloonAction {
 }
 
 const MARGIN = 15;
+/**
+ * Space between a sheet and the character. A sheet's tail sits inside its own
+ * padding (so the panel can clip for native resize without cutting the tail
+ * off), which puts the tip at the sheet's edge: it only needs a hair of air.
+ */
+const TAIL_GAP = 2;
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * The Office 97 tail: a skewed wedge drawn as SVG so the 1px outline runs
+ * cleanly from the balloon edge to the point. One shape per direction.
+ */
+const TAILS: Readonly<Record<'down' | 'up' | 'left' | 'right', { w: number; h: number; fill: string; line: string }>> = {
+  down: { w: 30, h: 20, fill: 'M0 0 L30 0 L21 19 Z', line: 'M1 .5 L21 19 L29 .5' },
+  up: { w: 30, h: 20, fill: 'M0 20 L30 20 L21 1 Z', line: 'M1 19.5 L21 1 L29 19.5' },
+  left: { w: 22, h: 30, fill: 'M22 0 L22 30 L1 21 Z', line: 'M21.5 1 L1 21 L21.5 29' },
+  right: { w: 22, h: 30, fill: 'M0 0 L0 30 L21 21 Z', line: 'M.5 1 L21 21 L.5 29' },
+};
+
+function tailFor(side: BalloonSide): keyof typeof TAILS {
+  if (side === 'left') return 'right';
+  if (side === 'right') return 'left';
+  return side.startsWith('top') ? 'down' : 'up';
+}
 
 /**
  * The speech balloon.
@@ -78,6 +111,7 @@ export class Balloon {
     this.holdingSuggestion = false;
     this.clearHideTimer();
     this.content.replaceChildren(document.createTextNode(placeholder));
+    delete this.el.dataset.sheet;
     this.locked = true;
     this.show();
   }
@@ -104,6 +138,7 @@ export class Balloon {
   say(text: string): void {
     if (this.locked) return;
     this.content.replaceChildren(document.createTextNode(text));
+    delete this.el.dataset.sheet;
     this.show();
   }
 
@@ -115,8 +150,16 @@ export class Balloon {
    * carries a visible, one-click way out and the dismissal is remembered by
    * kind. Escape does the same thing from the keyboard.
    */
-  suggest(text: string, actions: readonly BalloonAction[]): void {
+  suggest(
+    text: string,
+    actions: readonly BalloonAction[],
+    title = 'Mr. Clippy suggests',
+  ): void {
     if (this.locked) return;
+    const ribbon = document.createElement('div');
+    ribbon.className = 'mrclippy-rib mrclippy-rib-first';
+    ribbon.textContent = title;
+
     const body = document.createElement('div');
     body.className = 'mrclippy-balloon-text';
     body.textContent = text;
@@ -127,7 +170,7 @@ export class Balloon {
     for (const action of actions) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = `mrclippy-btn${action.primary ? ' mrclippy-btn-primary' : ''}`;
+      button.className = `mrclippy-btn mrclippy-btn-sm${action.primary ? ' mrclippy-btn-primary' : ''}`;
       button.textContent = action.label;
       button.addEventListener('click', (event) => {
         event.stopPropagation();
@@ -137,7 +180,8 @@ export class Balloon {
     }
 
     const wrapper = document.createElement('div');
-    wrapper.append(body, row);
+    wrapper.className = 'mrclippy-nudge';
+    wrapper.append(ribbon, body, row);
     this.render(wrapper);
     this.holdingSuggestion = true;
 
@@ -154,6 +198,8 @@ export class Balloon {
     this.holdingSuggestion = false;
     this.clearHideTimer();
     this.content.replaceChildren(node);
+    // A sheet: ribbons edge to edge, placed beside him rather than above.
+    this.el.dataset.sheet = '';
     this.locked = true;
     this.show();
   }
@@ -184,11 +230,6 @@ export class Balloon {
     this.hideTimer = undefined;
   }
 
-  /**
-   * Place the balloon in whichever quadrant has room, preferring above-left of
-   * the character. Measured against the viewport, not the document, because the
-   * character is fixed-position.
-   */
   /** Hold the balloon at a spot the user chose, instead of beside the character. */
   pin(left: number, top: number): void {
     this.pinned = { left, top };
@@ -205,6 +246,12 @@ export class Balloon {
     return this.pinned;
   }
 
+  /**
+   * Sheets (the panel, a suggestion) go beside him; plain lines go in whichever
+   * quadrant has room, preferring above-left of
+   * the character. Measured against the viewport, not the document, because the
+   * character is fixed-position.
+   */
   position(): void {
     if (this.pinned) {
       const b = this.el.getBoundingClientRect();
@@ -214,6 +261,8 @@ export class Balloon {
       this.el.style.top = `${top}px`;
       return;
     }
+    if (this.el.dataset.sheet !== undefined && this.placeBeside()) return;
+
     const side = this.chooseSide();
     const a = this.anchor.getBoundingClientRect();
     const b = this.el.getBoundingClientRect();
@@ -227,7 +276,54 @@ export class Balloon {
 
     this.el.style.top = `${Math.max(MARGIN, top)}px`;
     this.el.style.left = `${Math.max(MARGIN, clampedLeft)}px`;
+    this.setSide(side);
+  }
+
+  /**
+   * Sheets sit beside him, foot level with his, the tail pointing at him from
+   * the near edge. Returns false when neither side has room, so the caller can
+   * fall back to the quadrant placement.
+   */
+  private placeBeside(): boolean {
+    const a = this.anchor.getBoundingClientRect();
+    const b = this.el.getBoundingClientRect();
+    const roomLeft = a.left >= b.width + TAIL_GAP + MARGIN;
+    const roomRight = window.innerWidth - a.right >= b.width + TAIL_GAP + MARGIN;
+    if (!roomLeft && !roomRight) return false;
+
+    // His right first, as the design has it; his left when he is near the edge.
+    const side: BalloonSide = roomRight ? 'right' : 'left';
+    const left = side === 'left' ? a.left - b.width - TAIL_GAP : a.right + TAIL_GAP;
+    const maxTop = Math.max(MARGIN, window.innerHeight - b.height - MARGIN);
+    const top = Math.min(Math.max(MARGIN, a.bottom - b.height), maxTop);
+
+    // The tail aims at his middle, but never leaves the balloon's edge.
+    const aim = a.top + a.height * 0.4 - top - 15;
+    const tailY = Math.min(Math.max(10, aim), Math.max(10, b.height - 40));
+
+    this.el.style.left = `${left}px`;
+    this.el.style.top = `${top}px`;
+    this.el.style.setProperty('--mrclippy-tail-y', `${Math.round(tailY)}px`);
+    this.setSide(side);
+    return true;
+  }
+
+  private setSide(side: BalloonSide): void {
+    if (this.el.dataset.side === side && this.tip.firstChild) return;
     this.el.dataset.side = side;
+    const shape = TAILS[tailFor(side)];
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('width', String(shape.w));
+    svg.setAttribute('height', String(shape.h));
+    svg.setAttribute('viewBox', `0 0 ${shape.w} ${shape.h}`);
+    const fill = document.createElementNS(SVG_NS, 'path');
+    fill.setAttribute('d', shape.fill);
+    fill.setAttribute('class', 'mrclippy-tail-fill');
+    const line = document.createElementNS(SVG_NS, 'path');
+    line.setAttribute('d', shape.line);
+    line.setAttribute('class', 'mrclippy-tail-line');
+    svg.append(fill, line);
+    this.tip.replaceChildren(svg);
   }
 
   private chooseSide(): BalloonSide {

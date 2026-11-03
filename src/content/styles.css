@@ -2,17 +2,33 @@
  * Lives inside a shadow root, so nothing here leaks to the page and nothing on
  * the page reaches in. Selectors stay simple for that reason.
  *
- * The balloon is the Office 97 look rebuilt from scratch — authored CSS and a
- * border, not extracted artwork. It carries no licensing weight, which is why
- * the aesthetic survives even a build that ships no Microsoft assets at all.
+ * The balloon is the Office 97 look rebuilt from scratch: authored CSS, an SVG
+ * tail and pixel icons, not Microsoft artwork. It carries no licensing weight,
+ * which is why the aesthetic survives a build that ships no Microsoft assets.
  *
  * Deliberately light-only. This is chrome that sits over someone else's page;
  * following the OS theme would make it fight whatever it is floating above.
+ *
+ * This file: tokens, the character, the balloon shell, bevel buttons and the
+ * passage highlight. The panel's contents live in panel.css.
  */
 
 :host {
   all: initial;
+  --mc-bal: #ffffdc;
+  --mc-ink: #141400;
+  --mc-rib: linear-gradient(90deg, #000080, #1084d0);
+  --mc-face: #c0c0c0;
+  --mc-hair: #7f7f6d;
+  --mc-div: #d8c88a;
+  --mc-mute: #6b6449;
+  --mc-teal: #0b6b68;
+  --mc-navy: #000080;
+  --mc-why: #8a1c12;
+  --mc-font: Tahoma, "MS Sans Serif", "Segoe UI", Geneva, Verdana, sans-serif;
 }
+
+/* ---------- the character ---------- */
 
 .mrclippy-agent {
   position: fixed;
@@ -28,7 +44,7 @@
 }
 
 .mrclippy-agent:focus-visible {
-  outline: 2px solid #0b6b68;
+  outline: 2px solid var(--mc-teal);
   outline-offset: 3px;
   border-radius: 4px;
 }
@@ -38,457 +54,7 @@
   pointer-events: none;
 }
 
-.mrclippy-balloon {
-  position: fixed;
-  z-index: 2147483001;
-  max-width: 320px;
-  min-width: 160px;
-  padding: 12px 14px;
-  box-sizing: border-box;
-
-  background: #ffffdc;
-  border: 1px solid #7f7f6d;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
-
-  font-family: "Segoe UI", Tahoma, "Helvetica Neue", Arial, sans-serif;
-  font-size: 14px;
-  line-height: 1.45;
-  color: #141400;
-}
-
-.mrclippy-balloon[hidden] {
-  display: none;
-}
-
-.mrclippy-balloon-content {
-  overflow-wrap: anywhere;
-}
-
-/* The tail. Rotated square rather than a border triangle so the 1px outline
-   continues cleanly around the corner. */
-.mrclippy-balloon-tip {
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  background: #ffffdc;
-  transform: rotate(45deg);
-}
-
-.mrclippy-balloon[data-side^="top"] .mrclippy-balloon-tip {
-  bottom: -8px;
-  border-right: 1px solid #7f7f6d;
-  border-bottom: 1px solid #7f7f6d;
-}
-
-.mrclippy-balloon[data-side^="bottom"] .mrclippy-balloon-tip {
-  top: -8px;
-  border-left: 1px solid #7f7f6d;
-  border-top: 1px solid #7f7f6d;
-}
-
-.mrclippy-balloon[data-side$="left"] .mrclippy-balloon-tip {
-  right: 28px;
-}
-
-.mrclippy-balloon[data-side$="right"] .mrclippy-balloon-tip {
-  left: 28px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mrclippy-agent,
-  .mrclippy-balloon {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-
-.mrclippy-balloon-text {
-  margin-bottom: 10px;
-}
-
-.mrclippy-balloon-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.mrclippy-btn {
-  font: inherit;
-  font-size: 13px;
-  padding: 4px 12px;
-  border: 1px solid #7f7f6d;
-  border-radius: 4px;
-  background: #f3f3e0;
-  color: #141400;
-  cursor: pointer;
-}
-
-.mrclippy-btn:hover {
-  background: #e8e8d0;
-}
-
-.mrclippy-btn:focus-visible {
-  outline: 2px solid #0b6b68;
-  outline-offset: 1px;
-}
-
-.mrclippy-btn-primary {
-  background: #0b6b68;
-  border-color: #064442;
-  color: #ffffff;
-}
-
-.mrclippy-btn-primary:hover {
-  background: #08544f;
-}
-
-/* ---------- Office 97 chrome ----------
-   Beveled borders, MS Sans Serif, no rounded corners. This is authored CSS
-   reproducing an era's visual language, not extracted Microsoft artwork —
-   which is why the look survives a build that ships no Microsoft assets. */
-
-.mrclippy-balloon:has(.mrclippy-panel) {
-  width: 340px;
-  max-width: 340px;
-  padding: 0;
-  background: #c0c0c0;
-  border: 1px solid #000000;
-  border-radius: 0;
-  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.35);
-  font-family: "MS Sans Serif", Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 12px;
-}
-
-.mrclippy-balloon:has(.mrclippy-panel) .mrclippy-balloon-tip {
-  display: none;
-}
-
-.mrclippy-panel {
-  /* Outer bevel: light top-left, dark bottom-right. */
-  border-top: 1px solid #ffffff;
-  border-left: 1px solid #ffffff;
-  border-right: 1px solid #808080;
-  border-bottom: 1px solid #808080;
-  padding: 2px;
-}
-
-.mrclippy-titlebar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 2px 2px 4px;
-  background: linear-gradient(90deg, #000080, #1084d0);
-  color: #ffffff;
-}
-
-.mrclippy-title {
-  font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.02em;
-}
-
-.mrclippy-titlebtn {
-  width: 16px;
-  height: 14px;
-  padding: 0;
-  font: inherit;
-  font-size: 9px;
-  line-height: 1;
-  color: #000000;
-  background: #c0c0c0;
-  border-top: 1px solid #ffffff;
-  border-left: 1px solid #ffffff;
-  border-right: 1px solid #404040;
-  border-bottom: 1px solid #404040;
-  cursor: pointer;
-}
-
-.mrclippy-titlebtn:active {
-  border-color: #404040 #ffffff #ffffff #404040;
-}
-
-.mrclippy-body {
-  padding: 8px;
-  background: #ffffdc;
-  border-top: 1px solid #808080;
-  border-left: 1px solid #808080;
-  border-right: 1px solid #ffffff;
-  border-bottom: 1px solid #ffffff;
-  color: #000000;
-}
-
-.mrclippy-prompt {
-  margin: 0 0 8px;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-/* ---------- menu ---------- */
-
-.mrclippy-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.mrclippy-option {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  width: 100%;
-  padding: 4px 5px;
-  font: inherit;
-  font-size: 12px;
-  text-align: left;
-  color: #000000;
-  background: none;
-  border: 1px solid transparent;
-  cursor: pointer;
-}
-
-.mrclippy-option:hover,
-.mrclippy-option:focus-visible {
-  background: #000080;
-  color: #ffffff;
-  outline: none;
-}
-
-/* The radio dot, drawn rather than an input — Clippy's options were never
-   really radios, they just looked like them. */
-.mrclippy-dot {
-  flex: none;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #ffffff;
-  border-top: 1px solid #808080;
-  border-left: 1px solid #808080;
-  border-right: 1px solid #ffffff;
-  border-bottom: 1px solid #ffffff;
-  box-shadow: 0 0 0 1px #404040;
-}
-
-.mrclippy-option:hover .mrclippy-dot,
-.mrclippy-option:focus-visible .mrclippy-dot {
-  background: #000080;
-  box-shadow: 0 0 0 1px #ffffff;
-}
-
-.mrclippy-back {
-  margin-bottom: 7px;
-  padding: 1px 6px;
-  font: inherit;
-  font-size: 11px;
-  color: #000000;
-  background: #c0c0c0;
-  border-top: 1px solid #ffffff;
-  border-left: 1px solid #ffffff;
-  border-right: 1px solid #404040;
-  border-bottom: 1px solid #404040;
-  cursor: pointer;
-}
-
-.mrclippy-back:active {
-  border-color: #404040 #ffffff #ffffff #404040;
-}
-
-/* ---------- findings ---------- */
-
-.mrclippy-findings {
-  display: flex;
-  flex-direction: column;
-}
-
-.mrclippy-finding {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  padding: 5px 0;
-  font-size: 12px;
-  line-height: 1.4;
-  border-top: 1px solid #d8c88a;
-}
-
-.mrclippy-finding span {
-  flex: 1;
-}
-
-.mrclippy-dismiss {
-  flex: none;
-  width: 15px;
-  height: 14px;
-  padding: 0;
-  font: inherit;
-  font-size: 9px;
-  line-height: 1;
-  color: #000000;
-  background: #c0c0c0;
-  border-top: 1px solid #ffffff;
-  border-left: 1px solid #ffffff;
-  border-right: 1px solid #404040;
-  border-bottom: 1px solid #404040;
-  cursor: pointer;
-}
-
-.mrclippy-dismiss:active {
-  border-color: #404040 #ffffff #ffffff #404040;
-}
-
-/* ---------- edit receipt ---------- */
-
-.mrclippy-receipt {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 6px;
-  padding: 5px 6px;
-  font-style: normal;
-  background: #f4f4f4;
-  border: 1px solid #808080;
-}
-
-.mrclippy-receipt-head {
-  font-weight: 700;
-}
-
-.mrclippy-change {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding-top: 4px;
-  border-top: 1px solid #d0d0d0;
-}
-
-.mrclippy-change del {
-  color: #800000;
-}
-
-.mrclippy-change ins {
-  color: #006000;
-  text-decoration: none;
-}
-
-.mrclippy-change ins::before {
-  content: "\2192  ";
-}
-
-.mrclippy-change-failed del {
-  color: #606060;
-  text-decoration: none;
-}
-
-.mrclippy-change-why {
-  color: #800000;
-  font-style: italic;
-}
-
-.mrclippy-receipt .mrclippy-btn {
-  align-self: flex-start;
-  margin-top: 3px;
-}
-
-/* ---------- chat ---------- */
-
-.mrclippy-log {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.mrclippy-log:not(:empty) {
-  margin-bottom: 8px;
-  padding: 6px;
-  background: #ffffff;
-  border-top: 1px solid #808080;
-  border-left: 1px solid #808080;
-  border-right: 1px solid #ffffff;
-  border-bottom: 1px solid #ffffff;
-}
-
-.mrclippy-turn {
-  font-size: 12px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.mrclippy-turn-user {
-  font-weight: 700;
-}
-
-.mrclippy-turn-user::before {
-  content: "You: ";
-}
-
-.mrclippy-turn-error {
-  color: #800000;
-}
-
-.mrclippy-pending {
-  color: #606060;
-  font-style: italic;
-}
-
-.mrclippy-composer {
-  display: flex;
-  gap: 4px;
-  align-items: stretch;
-}
-
-.mrclippy-input {
-  flex: 1;
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.4;
-  padding: 3px 4px;
-  color: #000000;
-  background: #ffffff;
-  border-top: 1px solid #808080;
-  border-left: 1px solid #808080;
-  border-right: 1px solid #ffffff;
-  border-bottom: 1px solid #ffffff;
-  border-radius: 0;
-  resize: none;
-}
-
-.mrclippy-input:focus-visible {
-  outline: 1px dotted #000000;
-  outline-offset: -3px;
-}
-
-.mrclippy-btn {
-  font: inherit;
-  font-size: 12px;
-  min-width: 54px;
-  padding: 3px 10px;
-  color: #000000;
-  background: #c0c0c0;
-  border-top: 1px solid #ffffff;
-  border-left: 1px solid #ffffff;
-  border-right: 1px solid #404040;
-  border-bottom: 1px solid #404040;
-  border-radius: 0;
-  cursor: pointer;
-}
-
-.mrclippy-btn:active:not(:disabled) {
-  border-color: #404040 #ffffff #ffffff #404040;
-}
-
-.mrclippy-btn:disabled {
-  color: #808080;
-  cursor: default;
-}
-
-.mrclippy-btn-primary {
-  font-weight: 700;
-}
-
-/* ---------- the character's own close button ---------- */
-
+/* His own dismiss button, shown on hover. Not part of the panel. */
 .mrclippy-agent-close {
   position: absolute;
   top: -4px;
@@ -496,15 +62,13 @@
   width: 17px;
   height: 15px;
   padding: 0;
-  font-family: "MS Sans Serif", Tahoma, sans-serif;
-  font-size: 9px;
+  font-family: var(--mc-font);
+  font-size: 11px;
   line-height: 1;
-  color: #000000;
-  background: #c0c0c0;
-  border-top: 1px solid #ffffff;
-  border-left: 1px solid #ffffff;
-  border-right: 1px solid #404040;
-  border-bottom: 1px solid #404040;
+  color: #000;
+  background: var(--mc-face);
+  border: 0;
+  box-shadow: inset -1px -1px #404040, inset 1px 1px #fff;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s ease;
@@ -516,141 +80,352 @@
   opacity: 1;
 }
 
-.mrclippy-agent-close:active {
-  border-color: #404040 #ffffff #ffffff #404040;
+/* ---------- the balloon shell ---------- */
+
+.mrclippy-balloon {
+  position: fixed;
+  z-index: 2147483001;
+  max-width: 320px;
+  min-width: 160px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  background: var(--mc-bal);
+  border: 1px solid #000;
+  border-radius: 9px;
+  font-family: var(--mc-font);
+  font-size: 13px;
+  line-height: 1.38;
+  color: var(--mc-ink);
+  -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .mrclippy-agent-close {
-    transition: none;
-  }
+.mrclippy-balloon *,
+.mrclippy-balloon *::before,
+.mrclippy-balloon *::after {
+  box-sizing: border-box;
 }
 
-/* ---------- quick-start chips ---------- */
-
-.mrclippy-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  margin-bottom: 6px;
-}
-
-.mrclippy-chips[hidden] {
+.mrclippy-balloon[hidden] {
   display: none;
 }
 
-.mrclippy-chip {
-  font-family: "MS Sans Serif", Tahoma, sans-serif;
-  font-size: 11px;
-  padding: 2px 7px;
-  color: #000000;
-  background: #c0c0c0;
-  border-top: 1px solid #ffffff;
-  border-left: 1px solid #ffffff;
-  border-right: 1px solid #404040;
-  border-bottom: 1px solid #404040;
-  cursor: pointer;
+.mrclippy-balloon-content {
+  overflow-wrap: anywhere;
 }
 
-.mrclippy-chip:active {
-  border-color: #404040 #ffffff #ffffff #404040;
+/* A sheet (the panel, a suggestion): ribbons run edge to edge. */
+.mrclippy-balloon[data-sheet] {
+  padding: 0;
 }
 
-.mrclippy-titlebtns {
-  display: flex;
-  gap: 2px;
+/* The tail: an SVG wedge whose fill covers the balloon border where they meet. */
+.mrclippy-balloon-tip {
+  position: absolute;
+  pointer-events: none;
+  line-height: 0;
 }
 
-/* The log is always present now, so give it a resting height rather than
-   letting the panel jump between one turn and many. */
-.mrclippy-log {
-  min-height: 64px;
-  margin-bottom: 8px;
-  padding: 6px;
-  background: #ffffff;
-  border-top: 1px solid #808080;
-  border-left: 1px solid #808080;
-  border-right: 1px solid #ffffff;
-  border-bottom: 1px solid #ffffff;
+.mrclippy-balloon-tip svg {
+  display: block;
+  overflow: visible;
 }
 
-.mrclippy-turn-assistant::before {
-  content: "Mr. Clippy: ";
-  font-weight: 700;
+.mrclippy-tail-fill {
+  fill: var(--mc-bal);
 }
 
-.mrclippy-turn-assistant .mrclippy-findings {
-  margin-top: 4px;
+.mrclippy-tail-line {
+  fill: none;
+  stroke: #000;
+  stroke-width: 1;
 }
 
-/* Wider than the two glyph buttons: a word, so it is findable. */
-.mrclippy-titlebtn.mrclippy-titlebtn-settings {
-  width: auto;
-  padding: 0 6px;
-  font-size: 11px;
-  font-weight: 700;
+.mrclippy-balloon[data-side^="top"] .mrclippy-balloon-tip {
+  bottom: -19px;
 }
 
-/* Notes that point at a passage: hovering selects it in the document. */
-.mrclippy-locatable {
-  cursor: pointer;
+.mrclippy-balloon[data-side^="bottom"] .mrclippy-balloon-tip {
+  top: -19px;
 }
 
-.mrclippy-locatable:hover {
-  background: #fff3b0;
+.mrclippy-balloon[data-side$="-left"] .mrclippy-balloon-tip {
+  right: 28px;
 }
 
-.mrclippy-finding-actions {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 4px;
-  flex-shrink: 0;
+.mrclippy-balloon[data-side$="-right"] .mrclippy-balloon-tip {
+  left: 28px;
 }
 
-.mrclippy-fix {
-  font: inherit;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border: 1px solid #0b6b68;
-  border-radius: 3px;
-  background: #fffef4;
-  color: #0b6b68;
-  cursor: pointer;
+.mrclippy-balloon[data-side="left"] .mrclippy-balloon-tip {
+  right: -21px;
+  top: var(--mrclippy-tail-y, 24px);
 }
 
-.mrclippy-fix:hover {
-  background: #0b6b68;
-  color: #fffef4;
+.mrclippy-balloon[data-side="right"] .mrclippy-balloon-tip {
+  left: -21px;
+  top: var(--mrclippy-tail-y, 24px);
 }
 
-.mrclippy-proposals {
+/* Dragged somewhere else: it no longer points at him. */
+.mrclippy-balloon[data-pinned] .mrclippy-balloon-tip {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mrclippy-agent,
+  .mrclippy-balloon,
+  .mrclippy-agent-close {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ---------- the sheet ----------
+   Sheets (the panel and the suggestion balloons) are a transparent wrapper
+   whose padding holds the tail; the bubble is the content element. That lets
+   the panel clip for its native resize grip without cutting the tail off. */
+
+.mrclippy-balloon[data-sheet] {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
-.mrclippy-proposal-actions {
+.mrclippy-balloon[data-sheet] > .mrclippy-balloon-content {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--mc-bal);
+  border: 1px solid #000;
+  border-radius: 9px;
+}
+
+.mrclippy-balloon[data-sheet][data-side="left"] {
+  padding-right: 21px;
+}
+
+.mrclippy-balloon[data-sheet][data-side="right"] {
+  padding-left: 21px;
+}
+
+.mrclippy-balloon[data-sheet][data-side^="top"] {
+  padding-bottom: 19px;
+}
+
+.mrclippy-balloon[data-sheet][data-side^="bottom"] {
+  padding-top: 19px;
+}
+
+.mrclippy-balloon[data-sheet][data-side="left"] .mrclippy-balloon-tip {
+  right: 0;
+}
+
+.mrclippy-balloon[data-sheet][data-side="right"] .mrclippy-balloon-tip {
+  left: 0;
+}
+
+.mrclippy-balloon[data-sheet][data-side^="top"] .mrclippy-balloon-tip {
+  bottom: 0;
+}
+
+.mrclippy-balloon[data-sheet][data-side^="bottom"] .mrclippy-balloon-tip {
+  top: 0;
+}
+
+.mrclippy-balloon[data-sheet][data-pinned] {
+  padding: 0;
+}
+
+.mrclippy-balloon[data-sheet]:has(.mrclippy-nudge) {
+  width: 311px;
+  max-width: 311px;
+}
+
+/* ---------- ribbons ---------- */
+
+.mrclippy-rib {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 21px;
+  padding: 2px 6px 2px 10px;
+  background: var(--mc-rib);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.mrclippy-rib-first {
+  border-radius: 8px 8px 0 0;
+}
+
+/* ---------- the proactive suggestion and the key prompt ---------- */
+
+.mrclippy-balloon-text {
+  padding: 9px 12px 4px;
+  font-size: 12.5px;
+}
+
+.mrclippy-balloon-actions {
+  display: flex;
   gap: 6px;
-  margin-top: 4px;
+  justify-content: flex-end;
+  padding: 6px 12px 11px;
 }
 
-.mrclippy-proposal-skipped {
-  opacity: 0.45;
+/* ---------- bevel buttons ---------- */
+
+.mrclippy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 23px;
+  min-width: 0;
+  padding: 0 10px;
+  font-family: var(--mc-font);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+  color: #000;
+  background: var(--mc-face);
+  border: 0;
+  border-radius: 0;
+  box-shadow: inset -1px -1px #404040, inset 1px 1px #fff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
+  cursor: pointer;
 }
 
-.mrclippy-proposal-busy {
-  opacity: 0.6;
+.mrclippy-btn:active:not(:disabled) {
+  box-shadow: inset 1px 1px #404040, inset -1px -1px #fff, inset 2px 2px #808080, inset -2px -2px #dfdfdf;
+  padding-top: 2px;
+  padding-left: 11px;
+  padding-right: 9px;
 }
 
-.mrclippy-finding .mrclippy-finding-actions {
+.mrclippy-btn:focus-visible {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+
+.mrclippy-btn:disabled {
+  color: #808080;
+  text-shadow: 1px 1px #fff;
+  cursor: default;
+}
+
+.mrclippy-btn[hidden] {
+  display: none;
+}
+
+/* The default action: black ring. Primary adds the teal label. */
+.mrclippy-btn-default,
+.mrclippy-btn-primary {
+  outline: 1px solid #000;
+  outline-offset: 0;
+}
+
+.mrclippy-btn-primary {
+  color: var(--mc-teal);
+  font-weight: 700;
+}
+
+.mrclippy-btn-primary:focus-visible,
+.mrclippy-btn-default:focus-visible {
+  outline: 1px solid #000;
+  box-shadow: inset -1px -1px #404040, inset 1px 1px #fff, inset -2px -2px #808080, inset 2px 2px #dfdfdf,
+    inset 0 0 0 4px var(--mc-face), inset 0 0 0 5px #000;
+}
+
+.mrclippy-btn-sm {
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11.5px;
+}
+
+.mrclippy-btn-sm:active:not(:disabled) {
+  padding-left: 8px;
+  padding-right: 6px;
+}
+
+.mrclippy-btn-big {
+  height: 28px;
+  padding: 0 14px;
+}
+
+.mrclippy-sunk {
+  background: #fff;
+  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #404040, inset -2px -2px #dfdfdf;
+}
+
+/* ---------- bullets, progress ---------- */
+
+.mrclippy-bul {
+  display: block;
   flex: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #e3efff 0 13%, #5d93f0 34%, #1849c0 62%, #0b2a7a 100%);
+  box-shadow: 0 0 0 0.5px #062060;
 }
 
-/* The passage a note is about, painted over the page. */
+.mrclippy-bul-done {
+  background: radial-gradient(circle at 34% 30%, #fff 0 12%, #cfcab0 40%, #8f8a70 100%);
+  box-shadow: 0 0 0 0.5px #6b6449;
+}
+
+.mrclippy-bar {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  width: 84px;
+  height: 14px;
+  padding: 2px;
+  overflow: hidden;
+}
+
+.mrclippy-bar b {
+  flex: none;
+  width: 7px;
+  background: var(--mc-navy);
+  animation: mrclippy-chunk 1.8s steps(1) infinite;
+}
+
+.mrclippy-bar b:nth-child(n + 5) {
+  animation-name: mrclippy-chunk2;
+}
+
+@keyframes mrclippy-chunk {
+  0% {
+    opacity: 1;
+  }
+}
+
+@keyframes mrclippy-chunk2 {
+  0%,
+  45% {
+    opacity: 0;
+  }
+  46%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mrclippy-bar b {
+    animation: none;
+  }
+}
+
+/* ---------- the passage a note is about, painted over the page ---------- */
+
 .mrclippy-highlights {
   position: fixed;
   inset: 0;
@@ -662,276 +437,4 @@
   background: rgba(255, 214, 0, 0.45);
   border-bottom: 2px solid #d62828;
   mix-blend-mode: multiply;
-}
-
-/* Inline diff: context stays plain, only the change is marked. */
-.mrclippy-diff {
-  line-height: 1.5;
-}
-
-.mrclippy-diff del,
-.mrclippy-diff ins {
-  display: inline;
-  padding: 0 2px;
-  border-radius: 2px;
-}
-
-.mrclippy-diff del {
-  background: #fde2e2;
-}
-
-.mrclippy-diff ins {
-  background: #d7f5dd;
-}
-
-.mrclippy-diff-context {
-  color: #6b6449;
-}
-
-.mrclippy-diff-break {
-  display: inline-block;
-  margin: 0 3px;
-  padding: 0 5px;
-  font-size: 10.5px;
-  font-weight: 700;
-  border-radius: 3px;
-  background: #0b6b68;
-  color: #fffef4;
-  text-decoration: none;
-}
-
-.mrclippy-receipt-undone .mrclippy-diff {
-  opacity: 0.5;
-}
-
-.mrclippy-diff ins::before {
-  content: none;
-}
-
-.mrclippy-change .mrclippy-diff del {
-  color: #800000;
-}
-
-.mrclippy-change .mrclippy-diff ins {
-  color: #006000;
-}
-
-/* ---------- per-fix threads ---------- */
-
-.mrclippy-crumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.mrclippy-crumb[hidden] {
-  display: none;
-}
-
-.mrclippy-crumb-title {
-  flex: 1;
-  min-width: 0;
-  font-size: 11.5px;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mrclippy-back {
-  flex: none;
-  font-size: 11px;
-  padding: 1px 8px;
-}
-
-.mrclippy-pill {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 9px;
-  background: #e8e2c4;
-  color: #4a4430;
-  white-space: nowrap;
-}
-
-.mrclippy-pill[hidden] {
-  display: none;
-}
-
-.mrclippy-pill[data-tone="busy"] {
-  background: #fff3b0;
-}
-
-.mrclippy-pill[data-tone="ready"] {
-  background: #0b6b68;
-  color: #fffef4;
-}
-
-.mrclippy-pill[data-tone="done"] {
-  background: #d7f5dd;
-  color: #1b6e42;
-}
-
-.mrclippy-pill[data-tone="error"] {
-  background: #fde2e2;
-  color: #800000;
-}
-
-.mrclippy-fixall {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  margin: 6px 0;
-}
-
-.mrclippy-fixall-hint {
-  font-size: 11px;
-  color: #6b6449;
-}
-
-.mrclippy-fix-apply {
-  background: #0b6b68;
-  color: #fffef4;
-}
-
-.mrclippy-fix[hidden] {
-  display: none;
-}
-
-/* ---------- movable, resizable panel ---------- */
-
-.mrclippy-balloon.mrclippy-balloon-panel {
-  max-width: none;
-  width: 360px;
-  min-width: 280px;
-  min-height: 220px;
-  max-height: calc(100vh - 16px);
-  resize: both;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.mrclippy-balloon-panel .mrclippy-balloon-content,
-.mrclippy-balloon-panel .mrclippy-panel {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.mrclippy-balloon-panel .mrclippy-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.mrclippy-balloon-panel .mrclippy-viewport {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.mrclippy-balloon-panel .mrclippy-log {
-  flex: 1;
-  max-height: none;
-}
-
-.mrclippy-balloon-panel .mrclippy-titlebar {
-  cursor: move;
-  user-select: none;
-  touch-action: none;
-}
-
-.mrclippy-balloon[data-pinned] .mrclippy-balloon-tip {
-  display: none;
-}
-
-/* ---------- tightened (2026-11-03) ---------- */
-
-/* Lists are not chat: no speaker label, a quiet small-caps head instead. */
-.mrclippy-section::before {
-  content: none;
-}
-
-.mrclippy-section-head {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #6b6449;
-  margin-bottom: 2px;
-}
-
-.mrclippy-section + .mrclippy-section {
-  margin-top: 6px;
-}
-
-/* Receipts: a light card, not a sunken gray box. */
-.mrclippy-receipt {
-  gap: 0;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-left: 3px solid #0b6b68;
-  padding-left: 8px;
-}
-
-.mrclippy-receipt-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 11.5px;
-  padding-bottom: 3px;
-}
-
-.mrclippy-change {
-  padding: 4px 0;
-  border-top: 1px solid #ece6c8;
-}
-
-.mrclippy-btn.mrclippy-btn-small {
-  font-size: 11px;
-  padding: 1px 8px;
-  margin: 0;
-}
-
-.mrclippy-receipt .mrclippy-btn.mrclippy-btn-small {
-  align-self: auto;
-  margin-top: 0;
-}
-
-/* A change that did not land reads as not-done, not as a change. */
-.mrclippy-change-failed .mrclippy-diff {
-  opacity: 0.5;
-}
-
-.mrclippy-change-failed .mrclippy-diff del,
-.mrclippy-change-failed .mrclippy-diff ins {
-  background: transparent;
-}
-
-.mrclippy-change-failed .mrclippy-diff ins {
-  display: none;
-}
-
-.mrclippy-change-why {
-  font-size: 11px;
-  font-style: normal;
-  color: #8a5a00;
-  margin-top: 1px;
-}
-
-.mrclippy-diff del,
-.mrclippy-diff ins {
-  padding: 0 1px;
-}
-
-.mrclippy-diff-context {
-  color: #8a8466;
 }

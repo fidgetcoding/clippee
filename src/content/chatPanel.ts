@@ -1,9 +1,12 @@
 import type { ChatTurn } from '../agent/types';
-import { fixAllBar, proposalCard, receipt, type CardContext } from './changeCards';
-import { buildChips, buildTitleBar } from './panelChrome';
+import { fixAllBar, proposalCard, receipt, receiptScreen, type CardContext } from './changeCards';
+import { buildAskArea, buildChips, buildTitleBar, type AskArea, type TitleBar } from './panelChrome';
+import { NotesView } from './notesView';
 import {
   describeForHistory,
   fixQuestion,
+  fixTitle,
+  type AgentChange,
   type ChatPanelOptions,
   type PanelFinding,
   type Thread,
@@ -11,7 +14,11 @@ import {
 
 export {
   QUICK_ACTIONS,
+  docTitleFrom,
   fixQuestion,
+  fixTitle,
+  noteLabel,
+  tallyLine,
   type AgentChange,
   type AgentReply,
   type ChatPanelOptions,
@@ -19,29 +26,32 @@ export {
   type QuickAction,
 } from './chatTypes';
 
+const MAIN_PLACEHOLDER = 'Ask a question, or tell me what to change…';
+const FIX_PLACEHOLDER = 'Ask about this fix, or tell me to change it…';
+
 /**
- * A conversation, permanently.
+ * The panel: one speech-balloon sheet beside him.
  *
- * There is one view and it is the chat. Findings appear as an opening message
- * from him; quick actions are chips above the input; everything else is turns.
- * Nothing here is modal, so nothing can strand the user somewhere they have to
- * navigate out of.
+ * The notes screen is home. Every fix and every question gets a thread of its
+ * own, reached from its line in the list and left with "< Notes", so the list
+ * stays a list. Nothing here is modal and there is no close button: clicking
+ * him or pressing Escape puts it away.
  */
 export class ChatPanel {
   readonly el: HTMLElement;
-  /** The title bar. Dragging it moves the panel. */
+  /** The title ribbon. Dragging it moves the panel. */
   readonly handle: HTMLElement;
 
   private readonly main: Thread;
   private active: Thread;
   private readonly fixes = new Map<number, Thread>();
+  private fixAllThread: Thread | undefined;
+  private readonly title: TitleBar;
   private readonly viewport: HTMLElement;
-  private readonly crumb: HTMLElement;
-  private readonly crumbTitle: HTMLElement;
-  private chatList: HTMLElement | undefined;
-  private readonly input: HTMLTextAreaElement;
-  private readonly send: HTMLButtonElement;
+  private readonly footSlot: HTMLElement;
+  private readonly ask: AskArea;
   private readonly chips: HTMLElement;
+  private readonly notes: NotesView;
 
   private readonly cards: CardContext;
 
@@ -53,145 +63,113 @@ export class ChatPanel {
     };
     this.el = document.createElement('div');
     this.el.className = 'mrclippy-panel';
-    this.handle = buildTitleBar(options);
+    this.title = buildTitleBar(options);
+    this.handle = this.title.el;
+    this.title.back.addEventListener('click', () => this.show(this.main));
     this.el.appendChild(this.handle);
 
     const body = document.createElement('div');
     body.className = 'mrclippy-body';
 
-    // "← All notes" bar, shown only inside a Fix thread.
-    this.crumb = document.createElement('div');
-    this.crumb.className = 'mrclippy-crumb';
-    this.crumb.hidden = true;
-    const back = document.createElement('button');
-    back.type = 'button';
-    back.className = 'mrclippy-btn mrclippy-back';
-    back.textContent = '\u2190 All notes';
-    back.addEventListener('click', () => this.show(this.main));
-    this.crumbTitle = document.createElement('span');
-    this.crumbTitle.className = 'mrclippy-crumb-title';
-    this.crumb.append(back, this.crumbTitle);
-    body.appendChild(this.crumb);
-
     this.viewport = document.createElement('div');
     this.viewport.className = 'mrclippy-viewport';
     body.appendChild(this.viewport);
 
-    this.main = this.newThread('All notes');
-    this.active = this.main;
-    this.viewport.appendChild(this.main.log);
+    this.footSlot = document.createElement('div');
+    this.footSlot.className = 'mrclippy-foot';
+    this.footSlot.hidden = true;
+    body.appendChild(this.footSlot);
 
     this.chips = buildChips(
       () => void this.runAudit(),
       (question, label) => void this.submit(question, label),
     );
-    body.appendChild(this.chips);
-
-    const form = document.createElement('form');
-    form.className = 'mrclippy-composer';
-
-    this.input = document.createElement('textarea');
-    this.input.className = 'mrclippy-input';
-    this.input.rows = 2;
-    this.input.placeholder = 'Ask a question, or tell me what to change…';
-    this.input.setAttribute('aria-label', 'Ask Mr. Clippy');
-
-    this.send = document.createElement('button');
-    this.send.type = 'submit';
-    this.send.className = 'mrclippy-btn mrclippy-btn-primary';
-    this.send.textContent = 'Ask';
-
-    form.append(this.input, this.send);
-    form.addEventListener('submit', (event) => {
+    this.ask = buildAskArea(this.chips);
+    this.ask.form.addEventListener('submit', (event) => {
       event.preventDefault();
-      const question = this.input.value.trim();
+      const question = this.ask.input.value.trim();
       if (question.length === 0) return;
-      this.input.value = '';
+      this.ask.input.value = '';
       void this.submit(question);
     });
-
-    this.input.addEventListener('keydown', (event) => {
+    this.ask.input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
-        form.requestSubmit();
+        this.ask.form.requestSubmit();
       }
+    });
+    body.appendChild(this.ask.el);
+    this.el.appendChild(body);
+
+    // Escape from anywhere in the panel puts it away.
+    this.el.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') this.options.onClose();
     });
 
-    body.appendChild(form);
-    this.el.appendChild(body);
+    this.notes = new NotesView(options.findings.length, options.docTitle, (on) =>
+      this.el.classList.toggle('mrclippy-hide-fixed', on),
+    );
+    this.main = this.newThread('Mr. Clippy');
+    this.main.log.appendChild(this.notes.el);
+    this.active = this.main;
+    this.viewport.appendChild(this.main.log);
 
     this.opening();
   }
 
   focus(): void {
-    this.input.focus();
+    this.ask.input.focus();
   }
 
-  /**
-   * A new chat, listed under "Your questions" on the notes view so it can be
-   * reopened like a fix.
-   */
-  private startChat(title: string): Thread {
-    if (!this.chatList) {
-      const section = document.createElement('div');
-      section.className = 'mrclippy-turn mrclippy-section mrclippy-chats';
-      const head = document.createElement('div');
-      head.className = 'mrclippy-section-head';
-      head.textContent = 'Your questions';
-      this.chatList = document.createElement('div');
-      this.chatList.className = 'mrclippy-findings';
-      section.append(head, this.chatList);
-      this.main.log.appendChild(section);
-    }
-
-    const row = document.createElement('div');
-    row.className = 'mrclippy-finding mrclippy-locatable';
-    const label = document.createElement('span');
-    label.className = 'mrclippy-finding-text';
-    label.textContent = title;
-    const pill = document.createElement('span');
-    pill.className = 'mrclippy-pill';
-    pill.hidden = true;
-    const actions = document.createElement('span');
-    actions.className = 'mrclippy-finding-actions';
-    actions.appendChild(pill);
-    row.append(label, actions);
-
-    const thread = this.newThread(title, (status, tone) => {
-      pill.textContent = status;
-      pill.dataset.tone = tone ?? '';
-      pill.hidden = false;
-    });
-    row.addEventListener('click', () => this.show(thread));
-    this.chatList.appendChild(row);
-    return thread;
-  }
-
-  private newThread(title: string, onStatus?: Thread['onStatus']): Thread {
+  private newThread(
+    title: string,
+    onStatus?: Thread['onStatus'],
+    quiet = false,
+  ): Thread {
     const log = document.createElement('div');
     log.className = 'mrclippy-log';
-    return { log, title, history: [], busy: false, ...(onStatus ? { onStatus } : {}) };
+    return {
+      log,
+      title,
+      history: [],
+      busy: false,
+      ...(onStatus ? { onStatus } : {}),
+      ...(quiet ? { quiet } : {}),
+    };
+  }
+
+  /** A new chat, listed under "Your questions" so it can be reopened like a fix. */
+  private startChat(title: string): Thread {
+    let thread: Thread | undefined;
+    const row = this.notes.addQuestion(title, () => thread && this.show(thread));
+    thread = this.newThread(title, (state) => row.setState(state));
+    return thread;
   }
 
   /** Swap the visible thread. Each keeps its own scroll position and history. */
   private show(thread: Thread): void {
     this.active = thread;
     this.viewport.replaceChildren(thread.log);
-    const inFix = thread !== this.main;
-    this.crumb.hidden = !inFix;
-    this.crumbTitle.textContent = inFix ? thread.title : '';
-    this.chips.hidden = inFix;
-    this.input.placeholder = inFix
-      ? 'Ask about this fix, or tell me to change it\u2026'
-      : 'Ask a question, or tell me what to change\u2026';
+    const inThread = thread !== this.main;
+    this.el.dataset.view = inThread ? 'thread' : 'notes';
+    this.title.back.hidden = !inThread;
+    this.title.settings.hidden = inThread;
+    this.title.title.textContent = thread.title;
+    this.title.title.title = inThread ? thread.title : '';
+    this.chips.hidden = inThread;
+    this.ask.el.hidden = thread.quiet === true;
+    // A fix thread talks about its fix; a question's chat is the general box.
+    const isFix = [...this.fixes.values()].includes(thread);
+    this.ask.input.placeholder = isFix ? FIX_PLACEHOLDER : MAIN_PLACEHOLDER;
+    this.footSlot.replaceChildren(...(thread.foot ? [thread.foot] : []));
+    this.footSlot.hidden = !thread.foot;
     this.syncComposer();
     this.scroll(thread);
   }
 
   private syncComposer(): void {
-    this.send.disabled = this.active.busy;
-    this.send.textContent = this.active.busy ? '\u2026' : 'Ask';
+    this.ask.send.disabled = this.active.busy;
+    this.ask.send.textContent = this.active.busy ? '…' : 'Ask';
   }
 
   /**
@@ -205,12 +183,12 @@ export class ChatPanel {
   ): { thread: Thread; started: Promise<void> | undefined } {
     const existing = this.fixes.get(index);
     if (existing) return { thread: existing, started: undefined };
-    const thread = this.newThread(finding.text, onStatus);
+    const title = fixTitle(finding);
+    const thread = this.newThread(title, onStatus);
     this.fixes.set(index, thread);
-    thread.drafting = this.submit(fixQuestion(finding), `Fix: ${finding.text}`, thread);
+    thread.drafting = this.submit(fixQuestion(finding), `Fix: ${title}`, thread);
     return { thread, started: thread.drafting };
   }
-
 
   /**
    * Draft every fix in the background, a few at a time, so by the time the user
@@ -229,107 +207,57 @@ export class ChatPanel {
     });
   }
 
-
-
-  /** His first turn: what the local checks found, or an invitation. */
+  /** The notes screen: every local finding, each with its own fix. */
   private opening(): void {
     const { findings } = this.options;
-
-    if (findings.length === 0) {
-      this.appendText('assistant', "I've read it. Nothing I'd change — ask me anything.");
-      return;
-    }
-
-    const line = document.createElement('div');
-    line.className = 'mrclippy-turn mrclippy-section';
-
-    const intro = document.createElement('div');
-    intro.className = 'mrclippy-section-head';
-    intro.textContent = `${findings.length} note${findings.length === 1 ? '' : 's'}`;
-    line.appendChild(intro);
-
-    const list = document.createElement('div');
-    list.className = 'mrclippy-findings';
-
     const prefetch: (() => Promise<void> | undefined)[] = [];
     const fixable: (() => { thread: Thread })[] = [];
 
     findings.forEach((finding, index) => {
-      const row = document.createElement('div');
-      row.className = 'mrclippy-finding';
-
-      const text = document.createElement('span');
-      text.className = 'mrclippy-finding-text';
-      text.textContent = finding.text;
-      if (finding.anchor) this.pointsAt(row, finding.anchor);
-
-      const actions = document.createElement('span');
-      actions.className = 'mrclippy-finding-actions';
-
-      if (finding.anchor && this.options.canEdit !== false) {
-        const pill = document.createElement('span');
-        pill.className = 'mrclippy-pill';
-        pill.hidden = true;
-
-        // One click: applies the drafted fix straight from the list.
-        const apply = document.createElement('button');
-        apply.type = 'button';
-        apply.className = 'mrclippy-fix mrclippy-fix-apply';
-        apply.textContent = 'Apply';
-        apply.title = 'Apply this fix';
-        apply.hidden = true;
-
-        const review = document.createElement('button');
-        review.type = 'button';
-        review.className = 'mrclippy-fix mrclippy-review';
-        review.textContent = this.options.prefetch ? 'Review' : 'Fix';
-        review.title = 'See the before and after, or talk it through';
-
-        const onStatus: NonNullable<Thread['onStatus']> = (status, tone) => {
-          pill.textContent = status;
-          pill.dataset.tone = tone ?? '';
-          pill.hidden = tone === 'ready';
-          apply.hidden = tone !== 'ready';
-        };
-        const ensure = () => this.fixThread(index, finding, onStatus);
-
-        apply.addEventListener('click', () => {
-          apply.disabled = true;
-          void ensure().thread.applyAll?.().finally(() => {
-            apply.disabled = false;
-          });
-        });
-        review.addEventListener('click', () => {
-          this.show(ensure().thread);
-          review.textContent = 'Review';
-        });
-        if (this.options.prefetch) prefetch.push(() => ensure().started);
-        fixable.push(ensure);
-
-        actions.append(pill, apply, review);
-      }
-
-      const dismiss = document.createElement('button');
-      dismiss.type = 'button';
-      dismiss.className = 'mrclippy-dismiss';
-      dismiss.title = 'Never show this kind again';
-      dismiss.setAttribute('aria-label', 'Never show this kind again');
-      dismiss.textContent = '✕';
-      dismiss.addEventListener('click', () => {
-        this.options.onDismissFinding(index);
-        row.remove();
+      const canFix = finding.anchor !== undefined && this.options.canEdit !== false;
+      let ensure: (() => { thread: Thread; started: Promise<void> | undefined }) | undefined;
+      const row = this.notes.addNote(finding, {
+        dismiss: () => this.options.onDismissFinding(index),
+        ...(canFix
+          ? {
+              fix: {
+                label: this.options.prefetch ? 'Review' : 'Fix',
+                // One click: applies the drafted fix straight from the list.
+                apply: () => void ensure?.().thread.applyAll?.(),
+                review: () => {
+                  if (ensure) this.show(ensure().thread);
+                  row.opened();
+                },
+                retry: () => {
+                  this.fixes.delete(index);
+                  ensure?.();
+                },
+              },
+            }
+          : {}),
       });
-
-      actions.appendChild(dismiss);
-      row.append(text, actions);
-      list.appendChild(row);
+      if (finding.anchor) this.pointsAt(row.el, finding.anchor);
+      if (!canFix) return;
+      ensure = () => this.fixThread(index, finding, (state) => row.setState(state));
+      const start = ensure;
+      if (this.options.prefetch) prefetch.push(() => start().started);
+      fixable.push(start);
     });
 
-    line.appendChild(list);
-    if (fixable.length > 1) line.insertBefore(fixAllBar(this.cards, fixable, this.main), list);
-    this.main.log.appendChild(line);
-    this.scroll(this.main);
+    if (fixable.length > 1) {
+      this.notes.setFixAll(fixAllBar(fixable, (changes) => this.showFixAll(changes)));
+    }
     if (prefetch.length > 0) this.prefetchFixes(prefetch);
+  }
+
+  /** Fix all's result gets a screen of its own, reached again from the bar. */
+  private showFixAll(changes: AgentChange[]): void {
+    if (!this.fixAllThread) {
+      const thread = this.newThread('Fix all', undefined, true);
+      thread.log.appendChild(receiptScreen(this.cards, changes, thread));
+      this.fixAllThread = thread;
+    }
+    this.show(this.fixAllThread);
   }
 
   /**
@@ -354,7 +282,6 @@ export class ChatPanel {
     });
   }
 
-
   private appendText(
     role: ChatTurn['role'] | 'error',
     text: string,
@@ -369,6 +296,7 @@ export class ChatPanel {
   }
 
   private scroll(thread: Thread = this.active): void {
+    if (thread === this.main) return; // The list reads from the top.
     thread.log.scrollTop = thread.log.scrollHeight;
   }
 
@@ -381,7 +309,7 @@ export class ChatPanel {
     const thread = this.startChat('Check my structure');
     this.show(thread);
     thread.busy = true;
-    thread.onStatus?.('Working\u2026', 'busy');
+    thread.onStatus?.({ kind: 'working' });
     this.syncComposer();
 
     this.appendText('user', 'Check my structure', thread);
@@ -392,20 +320,20 @@ export class ChatPanel {
       const result = await this.options.onAudit();
       pending.classList.remove('mrclippy-pending');
       pending.textContent = result;
-      thread.onStatus?.('Answered', 'done');
+      thread.onStatus?.({ kind: 'answered' });
     } catch (error: unknown) {
       pending.remove();
       this.appendText('error', error instanceof Error ? error.message : 'Audit failed.', thread);
+      thread.onStatus?.({ kind: 'failed' });
     } finally {
       thread.busy = false;
       thread.history.push({ role: 'user', text: 'Check my structure' });
       thread.history.push({ role: 'assistant', text: pending.textContent ?? '' });
       this.syncComposer();
-      this.input.focus();
+      this.ask.input.focus();
       this.scroll(thread);
     }
   }
-
 
   /**
    * One turn. `shownAs` lets a quick-action chip show its short label in the
@@ -417,7 +345,7 @@ export class ChatPanel {
     thread: Thread = this.active,
   ): Promise<void> {
     // The list stays a list: a question asked from it gets a thread of its own.
-    if (thread === this.main) {
+    if (thread === this.main || thread.quiet) {
       thread = this.startChat(shownAs ?? question);
       this.show(thread);
     }
@@ -425,7 +353,7 @@ export class ChatPanel {
 
     thread.busy = true;
     this.syncComposer();
-    thread.onStatus?.('Working\u2026', 'busy');
+    thread.onStatus?.({ kind: 'working' });
 
     this.appendText('user', shownAs ?? question, thread);
     const pending = this.appendText('assistant', 'thinking…', thread);
@@ -442,26 +370,21 @@ export class ChatPanel {
         pending.appendChild(receipt(this.cards, reply.changes, thread));
       }
       const ready = reply.proposals?.length ?? 0;
-      thread.onStatus?.(ready > 0 ? `${ready} to review` : 'Answered', ready > 0 ? 'ready' : 'done');
+      thread.onStatus?.(ready > 0 ? { kind: 'ready', count: ready } : { kind: 'answered' });
       thread.history.push(
         { role: 'user', text: question },
         { role: 'assistant', text: describeForHistory(reply) },
       );
     } catch (error: unknown) {
       pending.remove();
-      this.appendText('error', error instanceof Error ? error.message : 'Something went wrong.', thread);
-      thread.onStatus?.('Failed', 'error');
+      const message = error instanceof Error ? error.message : 'Something went wrong.';
+      this.appendText('error', message, thread);
+      thread.onStatus?.({ kind: 'failed', reason: message });
     } finally {
       thread.busy = false;
       this.syncComposer();
-      if (thread === this.active) this.input.focus();
+      if (thread === this.active) this.ask.input.focus();
       this.scroll(thread);
     }
   }
 }
-
-
-/**
- * The model's memory of its own turn. Without the edits in it, a follow-up like
- * "undo the second one" or "now do the same to the intro" has nothing to refer to.
- */

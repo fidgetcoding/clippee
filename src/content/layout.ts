@@ -43,6 +43,8 @@ export function makePanelMovable(
   if (saved?.width) el.style.width = `${Math.max(MIN_WIDTH, saved.width)}px`;
   if (saved?.height) el.style.height = `${Math.max(MIN_HEIGHT, saved.height)}px`;
   if (saved) balloon.pin(saved.left, saved.top);
+  // The panel is wider than the placeholder it replaced: place it again.
+  else balloon.position();
 
   let drag: { dx: number; dy: number } | undefined;
   const down = (e: PointerEvent): void => {
