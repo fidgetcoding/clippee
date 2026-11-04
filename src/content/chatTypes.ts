@@ -23,6 +23,11 @@ export interface AgentChange {
   readonly reason?: string;
 }
 
+export interface UndoResult {
+  readonly message: string;
+  readonly undone: readonly AgentChange[];
+}
+
 export interface AgentReply {
   readonly text: string;
   readonly changes?: readonly AgentChange[];
@@ -33,7 +38,7 @@ export interface AgentReply {
 export interface ChatPanelOptions {
   readonly onAsk: (question: string, history: readonly ChatTurn[]) => Promise<AgentReply>;
   /** Reverse the applied changes from one reply. Resolves to a line for the log. */
-  readonly onUndo?: (changes: readonly AgentChange[]) => Promise<string>;
+  readonly onUndo?: (changes: readonly AgentChange[]) => Promise<string | UndoResult>;
   /** The structure audit. Runs the local-then-cloud ladder, not a chat turn. */
   readonly onAudit: () => Promise<string>;
   /** Local findings, offered as an opening move rather than shoved at the user. */
@@ -42,6 +47,8 @@ export interface ChatPanelOptions {
   readonly canEdit?: boolean;
   /** Apply accepted proposals. Resolves to what actually happened to each. */
   readonly onApply?: (edits: readonly DocumentEdit[]) => Promise<AgentChange[]>;
+  /** Redo known receipts without losing their shared undo identity. */
+  readonly onRedo?: (changes: readonly AgentChange[]) => Promise<AgentChange[]>;
   /** Select a passage in the page so the user can see it. */
   readonly onLocate?: (passage: string) => void;
   /** Draft every fix as soon as the panel opens, so Apply is one click. */

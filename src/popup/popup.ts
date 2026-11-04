@@ -131,7 +131,8 @@ async function main(): Promise<void> {
   el<HTMLInputElement>('host-enabled').addEventListener('change', () => {
     if (!host) return;
     void toggleHost(host).then((next) => {
-      settings = next;
+      // The worker's preference reply deliberately contains no credentials.
+      settings = { ...next, apiKey: settings.apiKey, workspaceId: settings.workspaceId };
       paint(settings, host);
     });
   });

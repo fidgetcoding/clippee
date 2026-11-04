@@ -82,7 +82,7 @@ export function isRequestMessage(value: unknown): value is RequestMessage {
     value.protocol === PROTOCOL &&
     typeof value.requestId === 'string' &&
     isRecord(value.request) &&
-    typeof value.request.kind === 'string'
+    validRequest(value.request)
   );
 }
 
@@ -92,6 +92,43 @@ export function isResponseMessage(value: unknown): value is ResponseMessage {
     value.protocol === PROTOCOL &&
     typeof value.requestId === 'string' &&
     isRecord(value.response) &&
-    typeof value.response.kind === 'string'
+    validResponse(value.response)
   );
+}
+
+function index(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function validRequest(value: Record<string, unknown>): boolean {
+  switch (value.kind) {
+    case 'getText': case 'getSelection': case 'probe': return true;
+    case 'setSelection': return index(value.start) && index(value.end) && value.end >= value.start;
+    case 'replace': return typeof value.find === 'string' && typeof value.text === 'string' &&
+      (value.near === undefined || index(value.near));
+    default: return false;
+  }
+}
+
+function validResponse(value: Record<string, unknown>): boolean {
+  switch (value.kind) {
+    case 'getText': return typeof value.text === 'string' &&
+      (value.strategy === ReadStrategy.AnnotatedApi || value.strategy === ReadStrategy.RectScrape);
+    case 'getSelection': {
+      const s = value.selection;
+      return s === undefined || (isRecord(s) && index(s.start) && index(s.end) &&
+        s.end >= s.start && typeof s.text === 'string');
+    }
+    case 'setSelection': return typeof value.applied === 'boolean';
+    case 'replace': {
+      const o = value.outcome;
+      return isRecord(o) && (o.applied === true ? index(o.start) :
+        o.applied === false && ['not-found', 'ambiguous', 'unavailable', 'unverified'].includes(String(o.reason)));
+    }
+    case 'probe': return typeof value.annotatedApi === 'boolean' &&
+      typeof value.flagSet === 'boolean' && index(value.rectCount);
+    case 'error': return typeof value.message === 'string' &&
+      ['getText', 'getSelection', 'setSelection', 'replace', 'probe'].includes(String(value.requestKind));
+    default: return false;
+  }
 }

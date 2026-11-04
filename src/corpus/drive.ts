@@ -125,7 +125,7 @@ export async function exportText(token: string, id: string): Promise<string> {
   if (response.status === 401) {
     throw new GoogleAuthError('Google access expired. Reconnect in the popup.');
   }
-  if (!response.ok) return '';
+  if (!response.ok) throw new Error(`Drive export returned ${String(response.status)}. Existing text was kept.`);
 
   // Exported docs carry a BOM that would otherwise lead every extracted text.
   return (await response.text()).replace(/^﻿/, '');

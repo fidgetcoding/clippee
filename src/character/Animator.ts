@@ -202,6 +202,17 @@ export class Animator {
     this.draw();
     this.playSound();
 
+    if (this.atLastFrame() && (!animation.useExitBranching || this.exiting)) {
+      // Hold the final pixels without waking the page forever. Clear state
+      // before the callback: it may synchronously start the next animation.
+      this.pause();
+      this.started = false;
+      const callback = this.endCallback;
+      this.endCallback = undefined;
+      callback?.(this.currentAnimationName ?? '', AnimatorState.Exited);
+      return;
+    }
+
     const duration = this.currentFrame?.duration ?? 100;
     this.timer = setTimeout(() => this.step(), duration);
 

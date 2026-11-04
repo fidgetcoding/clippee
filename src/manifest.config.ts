@@ -26,9 +26,9 @@ export default defineManifest({
     default_title: 'Mr. Clippy',
   },
 
-  // Broad host access is what lets the character live on any page. For a personal
-  // unpacked build this costs nothing; it would slow a store review considerably.
-  host_permissions: ['<all_urls>'],
+  // Cross-origin requests go only to the model API and the dormant Drive client.
+  // Editor injection is scoped separately by content_scripts below.
+  host_permissions: ['https://api.anthropic.com/*', 'https://www.googleapis.com/*'],
 
   background: isFirefox
     ? { scripts: ['src/background/serviceWorker.ts'], type: 'module' }
@@ -69,10 +69,17 @@ export default defineManifest({
 
   // The sprite sheet is fetched by the content script from the extension origin,
   // so it has to be reachable from the page context.
+  // Chrome resource matches require an origin-wide /* path; injection stays
+  // restricted to document editors by content_scripts above.
   web_accessible_resources: [
     {
       resources: ['src/packs/*/map.png', 'src/packs/*/pack.json', 'assets/*'],
-      matches: ['<all_urls>'],
+      matches: [
+        '*://docs.google.com/*',
+        'https://*.officeapps.live.com/*',
+        'https://www.notion.so/*',
+        'https://*.notion.site/*',
+      ],
     },
   ],
 

@@ -97,8 +97,9 @@ export class NotesView {
   }
 
   /** Fix all sits between the heading and the list. */
-  setFixAll(bar: HTMLElement): void {
-    this.el.insertBefore(bar, this.groups);
+  setFixAll(bar?: HTMLElement): void {
+    this.el.querySelector('.mrclippy-fixall')?.remove();
+    if (bar) this.el.insertBefore(bar, this.groups);
   }
 
   addNote(finding: PanelFinding, handlers: NoteHandlers): NoteRow {

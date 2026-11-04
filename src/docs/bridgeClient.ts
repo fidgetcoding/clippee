@@ -12,6 +12,7 @@ import {
 } from './protocol';
 
 interface Pending {
+  readonly kind: DocsRequest['kind'];
   readonly resolve: (response: DocsResponse) => void;
   readonly reject: (reason: Error) => void;
   readonly timer: ReturnType<typeof setTimeout>;
@@ -30,6 +31,10 @@ export class DocsBridgeClient {
   private readonly pending = new Map<string, Pending>();
   private readonly onResponse: EventListener;
   private seq = 0;
+  private readonly clientId = crypto.randomUUID();
+  private editTail: Promise<unknown> = Promise.resolve();
+  private editsPending = 0;
+  private disposed = false;
 
   constructor(
     private readonly timeoutMs: number = DEFAULT_TIMEOUT_MS,
@@ -41,6 +46,7 @@ export class DocsBridgeClient {
 
       const pending = this.pending.get(detail.requestId);
       if (!pending) return;
+      if (detail.response.kind === 'error' ? detail.response.requestKind !== pending.kind : detail.response.kind !== pending.kind) return;
 
       this.pending.delete(detail.requestId);
       clearTimeout(pending.timer);
@@ -56,6 +62,7 @@ export class DocsBridgeClient {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.target.removeEventListener(EVENT_RESPONSE, this.onResponse);
     for (const [id, pending] of this.pending) {
       clearTimeout(pending.timer);
@@ -94,6 +101,7 @@ export class DocsBridgeClient {
   }
 
   async setSelection(start: number, end: number): Promise<boolean> {
+    if (this.editsPending > 0) return false;
     try {
       const response = await this.send({ kind: 'setSelection', start, end });
       return response.kind === 'setSelection' && response.applied;
@@ -103,7 +111,14 @@ export class DocsBridgeClient {
   }
 
   /** Replace `find` with `text` in the document, verified by reading it back. */
-  async replace(find: string, text: string, near?: number): Promise<EditOutcome> {
+  replace(find: string, text: string, near?: number): Promise<EditOutcome> {
+    this.editsPending++;
+    const operation = this.editTail.then(() => this.replaceNow(find, text, near));
+    this.editTail = operation.catch(() => undefined);
+    return operation.finally(() => { this.editsPending--; });
+  }
+
+  private async replaceNow(find: string, text: string, near?: number): Promise<EditOutcome> {
     try {
       const response = await this.send(
         { kind: 'replace', find, text, ...(near === undefined ? {} : { near }) },
@@ -118,7 +133,8 @@ export class DocsBridgeClient {
   }
 
   private send(request: DocsRequest, timeoutMs = this.timeoutMs): Promise<DocsResponse> {
-    const requestId = `mr-clippy-${Date.now()}-${++this.seq}`;
+    if (this.disposed) return Promise.reject(new Error('Docs bridge disposed'));
+    const requestId = `mr-clippy-${this.clientId}-${++this.seq}`;
 
     return new Promise<DocsResponse>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -126,7 +142,7 @@ export class DocsBridgeClient {
         reject(new Error(`Docs bridge "${request.kind}" timed out`));
       }, timeoutMs);
 
-      this.pending.set(requestId, { resolve, reject, timer });
+      this.pending.set(requestId, { kind: request.kind, resolve, reject, timer });
       this.target.dispatchEvent(
         new CustomEvent(EVENT_REQUEST, { detail: { protocol: PROTOCOL, requestId, request } }),
       );

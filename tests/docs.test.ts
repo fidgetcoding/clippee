@@ -119,3 +119,13 @@ describe('bridge client', () => {
     await expect(pending).resolves.toBeUndefined();
   });
 });
+
+it('does not dispatch new bridge requests after disposal', async () => {
+  const target = document.implementation.createHTMLDocument();
+  let requests = 0;
+  target.addEventListener(EVENT_REQUEST, () => { requests++; });
+  const client = new DocsBridgeClient(30, target);
+  client.dispose();
+  expect(await client.getText()).toBeUndefined();
+  expect(requests).toBe(0);
+});

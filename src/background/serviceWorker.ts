@@ -4,12 +4,15 @@ import { structureSignals } from '../checks/structure';
 import type { AskRequest, AskResponse, AuditRequest, AuditResponse } from '../agent/types';
 import { ext } from '../platform';
 import { loadSettings } from '../settings';
+import { parseSettingsMutation, type SettingsResponse } from '../settingsProtocol';
+import { mutatePreferences } from './settingsStore';
 
 /**
  * Service worker.
  *
- * Chromium kills this after ~30s idle, so it holds no state — it relays the
- * keyboard command and owns the one thing that must never reach a content
+ * Chromium kills this after ~30s idle, so durable state stays in storage.
+ * It serializes pending settings mutations, relays the keyboard command,
+ * and owns the one thing that must never reach a content
  * script: the API key.
  */
 
@@ -19,33 +22,46 @@ ext.commands?.onCommand.addListener((command) => {
 });
 
 ext.runtime.onMessage.addListener(
-  (message: unknown, sender, sendResponse: (response: AskResponse | AuditResponse) => void) => {
-    if (isAskRequest(message)) {
-      void (async () => {
-        const settings = await loadSettings();
-        sendResponse(await ask(message, settings.apiKey, settings.workspaceId));
-      })();
-      // Keeps the message channel open for the async reply. Returning anything
-      // falsy here closes it and the content script's promise resolves undefined.
+  (message: unknown, sender, sendResponse: (response: AskResponse | AuditResponse | SettingsResponse | { hasKey: boolean }) => void) => {
+    if (isType(message, 'mrclippy:settings')) {
+      const mutation = parseSettingsMutation((message as { mutation?: unknown }).mutation);
+      if (!mutation) {
+        sendResponse({ ok: false, error: 'Invalid settings mutation.' });
+        return false;
+      }
+      void mutatePreferences(mutation).then(
+        (preferences) => sendResponse({ ok: true, preferences }),
+        () => sendResponse({ ok: false, error: 'Could not save settings. Try again.' }),
+      );
       return true;
     }
-
     if (isType(message, 'mrclippy:open-settings')) {
-      void openSettings(sender.tab?.url);
+      void openSettings(sender.tab?.url).catch(() => undefined);
       return false;
     }
+    if (!isType(message, 'mrclippy:ask') && !isType(message, 'mrclippy:audit') &&
+        !isType(message, 'mrclippy:has-key')) return false;
 
-    if (isType(message, 'mrclippy:has-key')) {
-      void loadSettings().then((s) => sendResponse({ hasKey: s.apiKey.length > 0 } as never));
-      return true;
-    }
-
-    if (isAuditRequest(message)) {
-      void (async () => sendResponse(await runAudit(message)))();
-      return true;
-    }
-
-    return false;
+    // Every recognized request receives one reply, including storage failures
+    // and malformed messages. No detached async rejection may strand the panel.
+    void (async () => {
+      try {
+        if (isType(message, 'mrclippy:has-key')) {
+          const settings = await loadSettings();
+          sendResponse({ hasKey: settings.apiKey.length > 0 });
+        } else if (isAskRequest(message)) {
+          const settings = await loadSettings();
+          sendResponse(await ask(message, settings.apiKey, settings.workspaceId));
+        } else if (isAuditRequest(message)) {
+          sendResponse(await runAudit(message));
+        } else {
+          sendResponse({ ok: false, error: 'Invalid request. Reload the tab and try again.' });
+        }
+      } catch (error: unknown) {
+        sendResponse({ ok: false, ...describe(error) });
+      }
+    })();
+    return true;
   },
 );
 
@@ -118,12 +134,20 @@ function isAuditRequest(value: unknown): value is AuditRequest {
 }
 
 function isAskRequest(value: unknown): value is AskRequest {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    (value as AskRequest).type === 'mrclippy:ask' &&
-    typeof (value as AskRequest).question === 'string'
-  );
+  if (!isType(value, 'mrclippy:ask')) return false;
+  const v = value as Record<string, unknown>;
+  const strings = (a: unknown): a is string[] => Array.isArray(a) && a.every((s) => typeof s === 'string');
+  return typeof v.question === 'string' && typeof v.document === 'string' &&
+    strings(v.findings) && Array.isArray(v.history) && v.history.every((turn: unknown) => {
+      if (!turn || typeof turn !== 'object') return false;
+      const t = turn as Record<string, unknown>;
+      return (t.role === 'user' || t.role === 'assistant') && typeof t.text === 'string';
+    }) && (v.canEdit === undefined || typeof v.canEdit === 'boolean') &&
+    (v.related === undefined || (Array.isArray(v.related) && v.related.every((passage: unknown) => {
+      if (!passage || typeof passage !== 'object') return false;
+      const p = passage as Record<string, unknown>;
+      return typeof p.title === 'string' && typeof p.text === 'string' && strings(p.path) && strings(p.reasons);
+    })));
 }
 
 async function relayToActiveTab(message: { type: string }): Promise<void> {

@@ -51,7 +51,7 @@ export class Renderer {
   }
 
   start(): void {
-    this.unsubscribe ??= this.detector.on((bp) => this.onBreakpoint(bp));
+    this.unsubscribe ??= this.detector.on((bp) => this.renderAt(bp));
   }
 
   stop(): void {
@@ -109,7 +109,7 @@ export class Renderer {
     return true;
   }
 
-  private onBreakpoint(breakpoint: Breakpoint): void {
+  renderAt(breakpoint: Breakpoint): void {
     if (!this.canRender(breakpoint)) return;
 
     const suggestion = this.queue.drain(breakpoint);

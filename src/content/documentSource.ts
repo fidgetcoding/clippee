@@ -16,6 +16,8 @@ import { docsBoxes, type Box } from './highlight';
  */
 export interface DocumentSource {
   readonly id: string;
+  /** Identifies the current editor/document across asynchronous operations. */
+  context?(): unknown;
   /** True when this source can handle the current page. */
   matches(): boolean;
   /** Full document text, or undefined if it cannot be read right now. */
@@ -49,10 +51,11 @@ export function createDomSource(): DocumentSource {
 
   return {
     id: 'dom',
+    context: () => field.identity,
     matches: () => true,
     read: async () => {
       const typed = field.read();
-      if (typed) return typed;
+      if (typed !== undefined) return typed;
       // Prefer the main content region: page chrome, nav and footers are somebody
       // else's prose and would pollute every document-level statistic.
       const main = document.querySelector<HTMLElement>('main, article, [role="main"]');
@@ -79,6 +82,7 @@ export function createDocsSource(): DocumentSource {
 
   return {
     id: 'google-docs',
+    context: () => location.href,
 
     matches: () =>
       location.hostname === 'docs.google.com' && location.pathname.includes('/document/'),

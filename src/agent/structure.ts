@@ -80,11 +80,19 @@ export async function judge(
     .join('');
 
   try {
-    const parsed = JSON.parse(text) as Omit<StructureFinding, 'about'>;
-    return { about: signal.detail, ...parsed };
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object') throw new Error('Invalid judgement');
+    const value = parsed as Record<string, unknown>;
+    if (typeof value.ok !== 'boolean' || !['high', 'medium', 'low'].includes(String(value.confidence)) ||
+        (!value.ok && (typeof value.problem !== 'string' || !value.problem.trim())) ||
+        (value.evidence !== undefined && typeof value.evidence !== 'string')) throw new Error('Invalid judgement');
+    return {
+      about: signal.detail, ok: value.ok, confidence: value.confidence as StructureFinding['confidence'],
+      ...(typeof value.problem === 'string' ? { problem: value.problem } : {}),
+      ...(typeof value.evidence === 'string' ? { evidence: value.evidence } : {}),
+    };
   } catch {
-    // A malformed judgement is a non-finding, never a guess.
-    return { about: signal.detail, ok: true, confidence: 'low' };
+    throw new Error('Claude did not return a valid structure judgement. Try again.');
   }
 }
 
@@ -104,12 +112,9 @@ export async function auditStructure(
   const findings: StructureFinding[] = [];
 
   for (const signal of signals.slice(0, maxCalls)) {
-    try {
-      const finding = await judge(client, document, signal);
-      if (!finding.ok && finding.problem) findings.push(finding);
-    } catch {
-      // One failed judgement must not sink the pass.
-    }
+    // A failed check is not evidence that the document is sound.
+    const finding = await judge(client, document, signal);
+    if (!finding.ok && finding.problem) findings.push(finding);
   }
 
   const order = { high: 0, medium: 1, low: 2 } as const;

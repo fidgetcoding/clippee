@@ -11,7 +11,7 @@ import type { EditOutcome } from '../docs/protocol';
 
 type Field = HTMLTextAreaElement | HTMLInputElement | HTMLElement;
 
-const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', '']);
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'url', 'tel', '']);
 const HOST_ID = 'mrclippy-host';
 
 function editableFrom(target: EventTarget | null): Field | undefined {
@@ -84,9 +84,15 @@ export class FieldEditor {
   read(): string | undefined {
     const field = this.field;
     if (!field?.isConnected) return undefined;
+    if (isPlainField(field)) {
+      if (field.disabled || field.readOnly ||
+          (field instanceof HTMLInputElement && !TEXT_INPUT_TYPES.has(field.type))) return undefined;
+    } else if (!field.isContentEditable) return undefined;
     const text = isPlainField(field) ? field.value : (field.textContent ?? '');
-    return text.trim().length > 0 ? text : undefined;
+    return text;
   }
+
+  get identity(): unknown { return this.field; }
 
   get active(): boolean {
     return this.read() !== undefined;

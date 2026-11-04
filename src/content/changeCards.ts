@@ -148,30 +148,49 @@ function undoRedo(
 ): { undo(): void; redo(): void } {
   let current = applied;
   let undone = false;
+  let batch = applied;
+  let busy = false;
+  const undoneChanges = new Set<AgentChange>();
   const idle = (): void => draw({ undone, many: current.length > 1 });
   idle();
   return {
     undo: () => {
       const { onUndo } = ctx.options;
-      if (!onUndo || undone) return;
+      if (!onUndo || undone || busy) return;
+      busy = true;
       draw({ undone, busy: 'Undoing…', many: current.length > 1 });
       void onUndo(current)
-        .then((line) => {
-          undone = true;
+        .then((result) => {
+          const completed = typeof result === 'string' ? current : result.undone;
+          for (const change of completed) undoneChanges.add(change);
+          current = current.filter((change) => !undoneChanges.has(change));
+          undone = current.length === 0;
+          if (undone) {
+            // Redo follows the original application order, not reverse undo order.
+            current = batch.filter((change) => undoneChanges.has(change));
+            thread.onStatus?.({ kind: 'answered' });
+          }
+          busy = false;
           idle();
-          ctx.appendText('assistant', line, thread);
+          ctx.appendText('assistant', typeof result === 'string' ? result : result.message, thread);
         })
         .catch((error: unknown) => {
+          busy = false;
           idle();
           ctx.appendText('error', error instanceof Error ? error.message : 'Undo failed.', thread);
         });
     },
     redo: () => {
-      const { onApply } = ctx.options;
-      if (!onApply || !undone) return;
+      const { onApply, onRedo } = ctx.options;
+      if ((!onApply && !onRedo) || !undone || busy) return;
+      busy = true;
       draw({ undone, busy: 'Redoing…', many: current.length > 1 });
-      void onApply(current.map((c) => ({ find: c.find, replace: c.replace })))
+      const pending = onRedo ? onRedo(current)
+        : onApply!(current.map((c) => ({ find: c.find, replace: c.replace })));
+      void pending
         .then((changes) => {
+          busy = false;
+          const attempted = current.length;
           const landed = changes.filter((c) => c.applied);
           if (landed.length === 0) {
             idle();
@@ -179,11 +198,16 @@ function undoRedo(
             return;
           }
           current = landed;
+          batch = landed;
+          undoneChanges.clear();
           undone = false;
+          thread.onStatus?.({ kind: 'applied' });
           idle();
-          ctx.appendText('assistant', 'Put the change back in.', thread);
+          ctx.appendText('assistant', landed.length === attempted ? 'Put the change back in.'
+            : `Put back ${landed.length} of ${attempted} changes. The rest could not be applied.`, thread);
         })
         .catch((error: unknown) => {
+          busy = false;
           idle();
           ctx.appendText('error', error instanceof Error ? error.message : 'Redo failed.', thread);
         });

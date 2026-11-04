@@ -8,7 +8,8 @@ export type QueuedTask = (done: () => void) => void;
  * idle scheduler can take over the moment Mr. Clippy has nothing else to do.
  */
 export class Queue {
-  private readonly tasks: QueuedTask[] = [];
+  private readonly tasks: { run: QueuedTask; cancel?: () => void }[] = [];
+  private activeCancel: (() => void) | undefined;
   private active = false;
   /** Bumped by `reset()`, so a task that was running then cannot advance the queue later. */
   private generation = 0;
@@ -23,14 +24,14 @@ export class Queue {
     return this.active;
   }
 
-  push(task: QueuedTask): void {
-    this.tasks.push(task);
+  push(task: QueuedTask, cancel?: () => void): void {
+    this.tasks.push({ run: task, cancel });
     if (!this.active) this.next();
   }
 
   /** Drop everything not yet started. Does not interrupt the running task. */
   clear(): void {
-    this.tasks.length = 0;
+    for (const task of this.tasks.splice(0)) task.cancel?.();
   }
 
   /**
@@ -38,9 +39,12 @@ export class Queue {
    * For when the user wants him gone now, not after the current animation.
    */
   reset(): void {
-    this.tasks.length = 0;
+    this.clear();
     this.generation += 1;
     this.active = false;
+    const cancel = this.activeCancel;
+    this.activeCancel = undefined;
+    cancel?.();
   }
 
   private next(): void {
@@ -53,11 +57,13 @@ export class Queue {
     this.active = true;
     let settled = false;
     const generation = this.generation;
-    task(() => {
+    this.activeCancel = task.cancel;
+    task.run(() => {
       // Guard against a task calling done() more than once, which would advance
       // the queue twice and interleave two animations.
       if (settled || generation !== this.generation) return;
       settled = true;
+      this.activeCancel = undefined;
       this.next();
     });
   }

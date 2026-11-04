@@ -1,4 +1,5 @@
 import { ext, hasExtensionApis } from './platform';
+import type { Preferences, SettingsMutation } from './settingsProtocol';
 
 /**
  * User controls.
@@ -63,23 +64,33 @@ export const SNOOZE_DURATIONS_MS = {
 } as const;
 
 function coerce(raw: unknown): Settings {
-  if (raw === null || typeof raw !== 'object') return { ...DEFAULT_SETTINGS };
+  if (raw === null || typeof raw !== 'object') return { ...DEFAULT_SETTINGS, disabledHosts: [] };
   const value = raw as Partial<Settings>;
   return {
-    enabled: value.enabled ?? DEFAULT_SETTINGS.enabled,
-    muted: value.muted ?? DEFAULT_SETTINGS.muted,
-    snoozeUntil: typeof value.snoozeUntil === 'number' ? value.snoozeUntil : 0,
-    disabledHosts: Array.isArray(value.disabledHosts) ? value.disabledHosts : [],
-    soundEnabled: value.soundEnabled ?? DEFAULT_SETTINGS.soundEnabled,
-    debugMode: value.debugMode ?? DEFAULT_SETTINGS.debugMode,
-    characterPack: value.characterPack ?? DEFAULT_SETTINGS.characterPack,
-    apiKey: typeof value.apiKey === 'string' ? value.apiKey : '',
+    enabled: typeof value.enabled === 'boolean' ? value.enabled : DEFAULT_SETTINGS.enabled,
+    muted: typeof value.muted === 'boolean' ? value.muted : DEFAULT_SETTINGS.muted,
+    snoozeUntil: typeof value.snoozeUntil === 'number' && Number.isFinite(value.snoozeUntil)
+      ? Math.max(0, value.snoozeUntil) : 0,
+    disabledHosts: Array.isArray(value.disabledHosts)
+      ? value.disabledHosts.filter((h): h is string => typeof h === 'string') : [],
+    soundEnabled: typeof value.soundEnabled === 'boolean' ? value.soundEnabled : DEFAULT_SETTINGS.soundEnabled,
+    debugMode: typeof value.debugMode === 'boolean' ? value.debugMode : DEFAULT_SETTINGS.debugMode,
+    characterPack: typeof value.characterPack === 'string' && /^[a-z0-9][a-z0-9_-]*$/i.test(value.characterPack)
+      ? value.characterPack : DEFAULT_SETTINGS.characterPack,
+    apiKey: '',
     workspaceId: '',
   };
 }
 
+/** Content scripts read preferences only; credentials stay in extension pages/worker. */
+export async function loadPreferences(): Promise<Settings> {
+  if (!hasExtensionApis()) return { ...DEFAULT_SETTINGS, disabledHosts: [] };
+  const stored = await ext.storage.sync.get(KEY);
+  return coerce(stored[KEY]);
+}
+
 export async function loadSettings(): Promise<Settings> {
-  if (!hasExtensionApis()) return { ...DEFAULT_SETTINGS };
+  if (!hasExtensionApis()) return { ...DEFAULT_SETTINGS, disabledHosts: [] };
   // Preferences sync across the user's machines; the API key deliberately does
   // not — `storage.sync` is replicated through the browser account.
   const [synced, local] = await Promise.all([
@@ -87,23 +98,46 @@ export async function loadSettings(): Promise<Settings> {
     ext.storage.local.get([SECRET_KEY, WORKSPACE_KEY]),
   ]);
   const settings = coerce(synced[KEY]);
-  const apiKey = (local[SECRET_KEY] ?? '') as string;
-  const workspaceId = (local[WORKSPACE_KEY] ?? '') as string;
+  const apiKey = typeof local[SECRET_KEY] === 'string' ? local[SECRET_KEY] : '';
+  const workspaceId = typeof local[WORKSPACE_KEY] === 'string' ? local[WORKSPACE_KEY] : '';
   return { ...settings, apiKey, workspaceId };
 }
 
+/** Extension pages alone call this credential-aware API. */
 export async function saveSettings(patch: Partial<Settings>): Promise<Settings> {
-  const current = await loadSettings();
-  const next: Settings = { ...current, ...patch };
-  if (!hasExtensionApis()) return next;
+  const { apiKey, workspaceId, ...preferences } = patch;
+  if ((apiKey !== undefined && typeof apiKey !== 'string') ||
+      (workspaceId !== undefined && typeof workspaceId !== 'string')) throw new Error('Invalid credentials.');
+  if (Object.keys(preferences).length > 0) await savePreferences(preferences);
+  // Keys use independent local storage entries, never a synced settings snapshot
+  // or a content-facing worker response. Combine a credential patch in one write.
+  const local: Record<string, string> = {};
+  if (apiKey !== undefined) local[SECRET_KEY] = apiKey;
+  if (workspaceId !== undefined) local[WORKSPACE_KEY] = workspaceId;
+  if (hasExtensionApis() && Object.keys(local).length > 0) await ext.storage.local.set(local);
+  return loadSettings();
+}
 
-  const { apiKey, workspaceId, ...preferences } = next;
-  await ext.storage.sync.set({ [KEY]: { ...preferences, apiKey: '', workspaceId: '' } });
-  if (patch.apiKey !== undefined) await ext.storage.local.set({ [SECRET_KEY]: apiKey });
-  if (patch.workspaceId !== undefined) {
-    await ext.storage.local.set({ [WORKSPACE_KEY]: workspaceId });
+export function savePreferences(patch: Partial<Preferences>): Promise<Settings> {
+  // Strip credentials even if an untyped content caller supplies them.
+  const { apiKey: _key, workspaceId: _workspace, ...preferences } = patch as Partial<Settings>;
+  return requestMutation({ kind: 'patch', patch: preferences });
+}
+
+async function requestMutation(mutation: SettingsMutation): Promise<Settings> {
+  const response: unknown = await ext.runtime.sendMessage({ type: 'mrclippy:settings', mutation });
+  if (!response || typeof response !== 'object') throw new Error('No reply while saving settings.');
+  const reply = response as { ok?: unknown; preferences?: unknown; error?: unknown };
+  if (reply.ok !== true) throw new Error(typeof reply.error === 'string' ? reply.error : 'Could not save settings.');
+  if (!reply.preferences || typeof reply.preferences !== 'object' || Array.isArray(reply.preferences)) {
+    throw new Error('Invalid settings reply.');
   }
-  return next;
+  return coerce(reply.preferences);
+}
+
+/** Read-modify-write toggles are evaluated inside the worker's shared queue. */
+export function toggleMuted(): Promise<Settings> {
+  return requestMutation({ kind: 'toggle-muted' });
 }
 
 export function onSettingsChanged(listener: (settings: Settings) => void): () => void {
@@ -134,12 +168,6 @@ export async function snooze(durationMs: number): Promise<Settings> {
   return saveSettings({ snoozeUntil: Date.now() + durationMs });
 }
 
-export async function toggleHost(hostname: string): Promise<Settings> {
-  const current = await loadSettings();
-  const disabled = current.disabledHosts.includes(hostname);
-  return saveSettings({
-    disabledHosts: disabled
-      ? current.disabledHosts.filter((h) => h !== hostname)
-      : [...current.disabledHosts, hostname],
-  });
+export function toggleHost(hostname: string): Promise<Settings> {
+  return requestMutation({ kind: 'toggle-host', hostname });
 }

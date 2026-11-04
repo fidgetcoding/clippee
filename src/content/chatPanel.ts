@@ -1,4 +1,4 @@
-import type { ChatTurn } from '../agent/types';
+import { MAX_HISTORY_TURNS, type ChatTurn } from '../agent/types';
 import { fixAllBar, proposalCard, receipt, receiptScreen, type CardContext } from './changeCards';
 import { buildAskArea, buildChips, buildTitleBar, type AskArea, type TitleBar } from './panelChrome';
 import { NotesView } from './notesView';
@@ -54,6 +54,8 @@ export class ChatPanel {
   private readonly notes: NotesView;
 
   private readonly cards: CardContext;
+  private disposed = false;
+  private readonly hoverTimers = new Set<ReturnType<typeof setTimeout>>();
 
   constructor(private readonly options: ChatPanelOptions) {
     this.cards = {
@@ -117,8 +119,15 @@ export class ChatPanel {
     this.opening();
   }
 
+  dispose(): void {
+    this.disposed = true;
+    for (const timer of this.hoverTimers) clearTimeout(timer);
+    this.hoverTimers.clear();
+    this.el.remove();
+  }
+
   focus(): void {
-    this.ask.input.focus();
+    if (!this.disposed) this.ask.input.focus();
   }
 
   private newThread(
@@ -197,7 +206,7 @@ export class ChatPanel {
   private prefetchFixes(starters: (() => Promise<void> | undefined)[]): void {
     const queue = [...starters];
     const worker = async (): Promise<void> => {
-      for (let next = queue.shift(); next; next = queue.shift()) await next();
+      for (let next = queue.shift(); next && !this.disposed; next = queue.shift()) await next();
     };
     // The first draft runs alone so it writes the document to the prompt cache;
     // the rest then read it from there instead of paying for it again.
@@ -211,13 +220,21 @@ export class ChatPanel {
   private opening(): void {
     const { findings } = this.options;
     const prefetch: (() => Promise<void> | undefined)[] = [];
-    const fixable: (() => { thread: Thread })[] = [];
+    const fixable = new Map<number, () => { thread: Thread }>();
+    const dismissed = new Set<number>();
+    const refreshFixAll = (): void => this.notes.setFixAll(fixable.size > 1
+      ? fixAllBar([...fixable.values()], (changes) => this.showFixAll(changes)) : undefined);
 
     findings.forEach((finding, index) => {
       const canFix = finding.anchor !== undefined && this.options.canEdit !== false;
       let ensure: (() => { thread: Thread; started: Promise<void> | undefined }) | undefined;
       const row = this.notes.addNote(finding, {
-        dismiss: () => this.options.onDismissFinding(index),
+        dismiss: () => {
+          dismissed.add(index);
+          fixable.delete(index);
+          refreshFixAll();
+          this.options.onDismissFinding(index);
+        },
         ...(canFix
           ? {
               fix: {
@@ -240,13 +257,11 @@ export class ChatPanel {
       if (!canFix) return;
       ensure = () => this.fixThread(index, finding, (state) => row.setState(state));
       const start = ensure;
-      if (this.options.prefetch) prefetch.push(() => start().started);
-      fixable.push(start);
+      if (this.options.prefetch) prefetch.push(() => dismissed.has(index) ? undefined : start().started);
+      fixable.set(index, start);
     });
 
-    if (fixable.length > 1) {
-      this.notes.setFixAll(fixAllBar(fixable, (changes) => this.showFixAll(changes)));
-    }
+    refreshFixAll();
     if (prefetch.length > 0) this.prefetchFixes(prefetch);
   }
 
@@ -271,14 +286,19 @@ export class ChatPanel {
     el.classList.add('mrclippy-locatable');
     let timer: ReturnType<typeof setTimeout> | undefined;
     el.addEventListener('mouseenter', () => {
-      timer = setTimeout(() => onLocate(passage), 250);
+      if (timer !== undefined) { clearTimeout(timer); this.hoverTimers.delete(timer); }
+      timer = setTimeout(() => {
+        if (timer !== undefined) this.hoverTimers.delete(timer);
+        if (!this.disposed) onLocate(passage);
+      }, 250);
+      this.hoverTimers.add(timer);
     });
     el.addEventListener('mouseleave', () => {
-      if (timer !== undefined) clearTimeout(timer);
+      if (timer !== undefined) { clearTimeout(timer); this.hoverTimers.delete(timer); }
     });
     el.addEventListener('click', (event) => {
       if ((event.target as HTMLElement).closest('button')) return;
-      onLocate(passage);
+      if (!this.disposed) onLocate(passage);
     });
   }
 
@@ -306,6 +326,7 @@ export class ChatPanel {
    * costs nothing and answers instantly.
    */
   private async runAudit(): Promise<void> {
+    if (this.disposed) return;
     const thread = this.startChat('Check my structure');
     this.show(thread);
     thread.busy = true;
@@ -318,8 +339,10 @@ export class ChatPanel {
 
     try {
       const result = await this.options.onAudit();
+      if (this.disposed) return;
       pending.classList.remove('mrclippy-pending');
       pending.textContent = result;
+      thread.history.push({ role: 'user', text: 'Check my structure' }, { role: 'assistant', text: result });
       thread.onStatus?.({ kind: 'answered' });
     } catch (error: unknown) {
       pending.remove();
@@ -327,10 +350,8 @@ export class ChatPanel {
       thread.onStatus?.({ kind: 'failed' });
     } finally {
       thread.busy = false;
-      thread.history.push({ role: 'user', text: 'Check my structure' });
-      thread.history.push({ role: 'assistant', text: pending.textContent ?? '' });
       this.syncComposer();
-      this.ask.input.focus();
+      if (!this.disposed && thread === this.active) this.ask.input.focus();
       this.scroll(thread);
     }
   }
@@ -344,6 +365,7 @@ export class ChatPanel {
     shownAs?: string,
     thread: Thread = this.active,
   ): Promise<void> {
+    if (this.disposed) return;
     // The list stays a list: a question asked from it gets a thread of its own.
     if (thread === this.main || thread.quiet) {
       thread = this.startChat(shownAs ?? question);
@@ -361,6 +383,7 @@ export class ChatPanel {
 
     try {
       const reply = await this.options.onAsk(question, [...thread.history]);
+      if (this.disposed) return;
       pending.classList.remove('mrclippy-pending');
       pending.textContent = reply.text;
       if (reply.proposals && reply.proposals.length > 0) {
@@ -375,6 +398,7 @@ export class ChatPanel {
         { role: 'user', text: question },
         { role: 'assistant', text: describeForHistory(reply) },
       );
+      thread.history.splice(0, Math.max(0, thread.history.length - MAX_HISTORY_TURNS));
     } catch (error: unknown) {
       pending.remove();
       const message = error instanceof Error ? error.message : 'Something went wrong.';
@@ -383,7 +407,7 @@ export class ChatPanel {
     } finally {
       thread.busy = false;
       this.syncComposer();
-      if (thread === this.active) this.ask.input.focus();
+      if (!this.disposed && thread === this.active) this.ask.input.focus();
       this.scroll(thread);
     }
   }

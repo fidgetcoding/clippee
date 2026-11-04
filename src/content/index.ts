@@ -5,29 +5,22 @@ import { ext } from '../platform';
 import { BreakpointDetector } from '../scheduler/BreakpointDetector';
 import { Renderer } from '../scheduler/Renderer';
 import { SuggestionQueue } from '../scheduler/SuggestionQueue';
+import type { Breakpoint } from '../scheduler/types';
 import {
-  isActiveOn,
   isSilenced,
-  loadSettings,
-  onSettingsChanged,
-  saveSettings,
+  savePreferences,
+  toggleMuted,
   type Settings,
 } from '../settings';
 import { resolveSource } from './documentSource';
+import { DraftCache } from './draftCache';
 import { isWritingSurface } from './surfaces';
 import { Highlighter } from './highlight';
 import { loadLayout, makePanelMovable, saveLayout } from './layout';
 import { ChatPanel, docTitleFrom, type AgentChange, type AgentReply } from './chatPanel';
 import type { AskResponse, AuditResponse, ChatTurn, DocumentEdit } from '../agent/types';
-import type { EditFailure } from '../docs/protocol';
-
-/** What each failure means to someone who is not debugging the bridge. */
-const FAILURE_REASONS: Readonly<Record<EditFailure, string>> = {
-  'not-found': "Couldn't find that passage. It may have changed.",
-  ambiguous: 'That phrase appears more than once, so I left it alone.',
-  unavailable: "The page wouldn't let me type there. Reloading the tab usually fixes it.",
-  unverified: "I typed it, but couldn't confirm it landed. Check the document.",
-};
+import { EditHistory } from './editHistory';
+import { startPageLifecycle, type PageRuntime } from './pageLifecycle';
 
 const DISMISSAL_KEY = 'mrclippy:dismissals';
 
@@ -56,7 +49,7 @@ async function hasApiKey(): Promise<boolean> {
     const reply = (await ext.runtime.sendMessage({ type: 'mrclippy:has-key' })) as
       | { hasKey?: boolean }
       | undefined;
-    return reply?.hasKey === true;
+    return typeof reply?.hasKey === 'boolean' ? reply.hasKey : true;
   } catch {
     return true; // Unknown: don't nag on a guess.
   }
@@ -65,20 +58,17 @@ async function hasApiKey(): Promise<boolean> {
 /** The greeting holds for 7s; the key prompt follows once it has cleared. */
 const KEY_PROMPT_DELAY_MS = 9_000;
 
-async function main(): Promise<void> {
-  if (!isWritingSurface(location)) return;
-  // Word's editor is an iframe, so frames are allowed there and nowhere else.
-  if (window.top !== window.self && !location.hostname.endsWith('.officeapps.live.com')) return;
-  if (!document.body) return;
-
-  let settings = await loadSettings();
-  if (!isActiveOn(settings, location.hostname)) return;
-
-  const { mountHost } = await import('./host');
+async function mountRuntime(
+  settings: Settings, current: () => boolean, hidden: boolean,
+): Promise<PageRuntime | undefined> {
+  // No DOM/listeners/timers until all startup reads finish and this attempt is
+  // still enabled on the same page. Disabled or superseded attempts stay inert.
+  const [{ mountHost }, pack, stored, layout] = await Promise.all([
+    import('./host'), loadPack(settings.characterPack),
+    ext.storage.local.get(DISMISSAL_KEY), loadLayout(),
+  ]);
+  if (!current()) return undefined;
   const host = mountHost();
-  const pack = await loadPack(settings.characterPack);
-
-  const stored = await ext.storage.local.get(DISMISSAL_KEY);
   const dismissals = (stored[DISMISSAL_KEY] ?? {}) as Record<string, number>;
 
   const queue = new SuggestionQueue({ dismissals });
@@ -86,8 +76,10 @@ async function main(): Promise<void> {
     settings.debugMode ? { minSilenceMs: DEBUG_SILENCE_MS } : {},
   );
 
-  const layout = await loadLayout();
   let releasePanel: (() => void) | undefined;
+  let disposed = false;
+  let panelGeneration = 0;
+  let keyPromptTimer: ReturnType<typeof setTimeout> | undefined;
 
   const agent = new Agent(pack, {
     ...(layout.agent ? { position: layout.agent } : {}),
@@ -96,7 +88,7 @@ async function main(): Promise<void> {
     onDismiss: () => {
       closePanel();
       agent.hide();
-      void saveSettings({ snoozeUntil: Date.now() + HIDE_DURATION_MS });
+      void savePreferences({ snoozeUntil: Date.now() + HIDE_DURATION_MS }).catch(() => undefined);
     },
   });
   host.root.append(agent.root, agent.balloon.el);
@@ -139,52 +131,61 @@ async function main(): Promise<void> {
    * Produce candidates. Never renders — keeping "found something" separate from
    * "said something" is what makes the interruption policy auditable.
    */
-  async function runChecks(): Promise<void> {
-    if (renderer.isMuted) return;
-    // Proactive notes are about the writer's own text. On an ordinary page that
-    // means a field they have typed in; the page body is somebody else's prose,
-    // and repeated nav or card titles read as echoes. Clicking him still reviews
-    // the whole page on request.
-    if (!source.canEdit()) return;
-    const text = await source.read();
-    if (!text || text === lastReviewed) return;
-    lastReviewed = text;
-    for (const suggestion of review(text)) queue.add(suggestion);
+  let checking = false;
+  async function runChecks(breakpoint: Breakpoint): Promise<void> {
+    if (checking || disposed || !agent.isVisible) return;
+    checking = true;
+    try {
+      // Snooze expiry is time-based, not a storage-change event.
+      renderer.setMuted(isSilenced(settings));
+      if (renderer.isMuted || !source.canEdit()) return;
+      const context = source.context?.();
+      const text = await source.read();
+      if (context !== source.context?.()) { queue.clear(); return; }
+      if (disposed || !agent.isVisible || isSilenced(settings)) return;
+      if (!text) { queue.clear(); lastReviewed = ''; return; }
+      if (text !== lastReviewed) {
+        lastReviewed = text;
+        queue.clear();
+        for (const suggestion of review(text)) queue.add(suggestion);
+      }
+      // Reading is asynchronous. Drain only after fresh candidates exist; the
+      // renderer rechecks silence/engagement so typing during the read is safe.
+      renderer.renderAt(breakpoint);
+    } finally {
+      checking = false;
+    }
   }
 
   let panel: ChatPanel | undefined;
 
-  /** Where each applied edit landed, so undo can find it again. */
-  const landedAt = new WeakMap<AgentChange, number>();
+  const editHistory = new EditHistory(source);
 
   /**
    * Fix drafts, keyed by question and the document they were drafted against.
    * Reopening the panel on unchanged text reuses them instead of paying again.
    */
-  const drafts = new Map<string, Promise<AgentReply>>();
+  const drafts = new DraftCache<AgentReply>();
 
-  function askAgent(question: string, history: readonly ChatTurn[]): Promise<AgentReply> {
-    if (history.length > 0) return askAgentUncached(question, history);
-    return (async () => {
-      const document_ = (await source.read()) ?? '';
-      const key = `${question}\u0000${document_}`;
-      let draft = drafts.get(key);
-      if (!draft) {
-        draft = askAgentUncached(question, history);
-        drafts.set(key, draft);
-        // A failure should be retryable, not remembered.
-        draft.catch(() => drafts.delete(key));
-      }
-      return draft;
-    })();
+  async function askAgent(question: string, history: readonly ChatTurn[]): Promise<AgentReply> {
+    const generation = panelGeneration;
+    const context = source.context?.();
+    const document_ = (await source.read()) ?? '';
+    if (context !== source.context?.()) throw new Error('The active editor changed. Reopen the panel.');
+    if (disposed || generation !== panelGeneration) throw new Error('Panel closed.');
+    const canEdit = source.canEdit();
+    const build = () => askAgentUncached(question, history, document_, canEdit);
+    return history.length > 0 ? build() : drafts.get(document_, canEdit, question, build);
   }
 
   /** Send a question to the background worker, which owns the API key. */
   async function askAgentUncached(
     question: string,
     history: readonly ChatTurn[],
+    document_: string,
+    canEdit: boolean,
   ): Promise<AgentReply> {
-    const document_ = (await source.read()) ?? '';
+    if (disposed) throw new Error('Panel closed.');
     const findings = review(document_).map((f) => f.text);
 
     const response = (await ext.runtime.sendMessage({
@@ -193,7 +194,7 @@ async function main(): Promise<void> {
       document: document_,
       history,
       findings,
-      canEdit: source.canEdit(),
+      canEdit,
     })) as AskResponse | undefined;
 
     if (!response) throw new Error('No reply from the background worker. Try reloading the tab.');
@@ -208,9 +209,9 @@ async function main(): Promise<void> {
   }
 
   /** The user accepted one or more proposals. */
-  async function applyProposals(edits: readonly DocumentEdit[]): Promise<AgentChange[]> {
+  async function applyProposals(edits: readonly DocumentEdit[], context = source.context?.()): Promise<AgentChange[]> {
     void agent.play('Writing');
-    const changes = await applyEdits(edits);
+    const changes = await editHistory.apply(edits, context);
     // Anything he typed is new text: re-review it at the next seam, not now.
     lastReviewed = '';
     return changes;
@@ -224,53 +225,23 @@ async function main(): Promise<void> {
    */
   async function locatePassage(passage: string): Promise<void> {
     try {
-      await source.select(passage);
+      const generation = panelGeneration;
+      if (disposed || !(await source.select(passage))) return;
       await new Promise((r) => setTimeout(r, 250));
-      highlighter.show(source.boxes(passage));
+      if (!disposed && generation === panelGeneration) highlighter.show(source.boxes(passage));
     } catch {
       // Nothing to point at — the text may have changed since the check ran.
     }
   }
 
-  /**
-   * One at a time, in order. Each edit is located in the document as it stands
-   * after the previous one, so earlier edits can never shift a later one onto
-   * the wrong words.
-   */
-  async function applyEdits(edits: readonly DocumentEdit[]): Promise<AgentChange[]> {
-    const changes: AgentChange[] = [];
-    for (const edit of edits) {
-      const outcome = await source.replace(edit.find, edit.replace);
-      const change: AgentChange = outcome.applied
-        ? { find: edit.find, replace: edit.replace, applied: true }
-        : {
-            find: edit.find,
-            replace: edit.replace,
-            applied: false,
-            reason: FAILURE_REASONS[outcome.reason],
-          };
-      if (outcome.applied) landedAt.set(change, outcome.start);
-      changes.push(change);
-    }
-    return changes;
-  }
-
-  /** Reverse order, each one pinned to where it was written. */
-  async function undoChanges(changes: readonly AgentChange[]): Promise<string> {
-    let undone = 0;
-    for (const change of [...changes].reverse()) {
-      const outcome = await source.replace(change.replace, change.find, landedAt.get(change));
-      if (outcome.applied) undone += 1;
-    }
-    lastReviewed = '';
-    if (undone === changes.length) return 'Put it back the way it was.';
-    if (undone === 0) throw new Error("Couldn't undo that. The text has changed since. Cmd+Z still works.");
-    return `Undid ${undone} of ${changes.length}. The rest had changed since. Cmd+Z can get them.`;
-  }
-
   /** Run the structure ladder and render the result as one readable answer. */
   async function auditStructure(): Promise<string> {
+    const generation = panelGeneration;
+    const context = source.context?.();
     const text = (await source.read()) ?? '';
+    if (disposed || generation !== panelGeneration || context !== source.context?.()) {
+      throw new Error('The active editor changed or the panel closed. Reopen the panel.');
+    }
     if (!text) return source.explainFailure?.() ?? "I can't read this document.";
 
     const response = (await ext.runtime.sendMessage({
@@ -294,6 +265,9 @@ async function main(): Promise<void> {
   }
 
   function openPanel(): void {
+    if (disposed) return;
+    const generation = ++panelGeneration;
+    const context = source.context?.();
     // Everything that protects the panel happens NOW, synchronously, before any
     // await. Reading a Google Doc is a bridge round-trip, and taking the lock
     // only once the text arrives leaves a window where a queued speak or a
@@ -305,7 +279,9 @@ async function main(): Promise<void> {
     void agent.play('CheckingSomething');
 
     void (async () => {
-      const text = await source.read();
+      const [text, savedLayout] = await Promise.all([source.read(), loadLayout()]);
+      if (disposed || generation !== panelGeneration) return;
+      if (context !== source.context?.()) throw new Error('The active editor changed.');
 
       // A failed read is worth saying out loud — the three Docs failure modes
       // need three different fixes, and "it didn't work" helps nobody.
@@ -328,11 +304,24 @@ async function main(): Promise<void> {
         ...(docTitle ? { docTitle } : {}),
         canEdit: source.canEdit(),
         prefetch: source.canEdit(),
-        onAsk: askAgent,
-        onApply: applyProposals,
+        onAsk: (question, history) => context === source.context?.()
+          ? askAgent(question, history)
+          : Promise.reject(new Error('The active editor changed. Reopen the panel.')),
+        onApply: (edits) => applyProposals(edits, context),
         onLocate: locatePassage,
-        onUndo: undoChanges,
-        onAudit: auditStructure,
+        onRedo: async (changes) => {
+          const result = await editHistory.redo(changes, context);
+          lastReviewed = '';
+          return result;
+        },
+        onUndo: async (changes) => {
+          const result = await editHistory.undo(changes);
+          lastReviewed = '';
+          return result;
+        },
+        onAudit: () => context === source.context?.()
+          ? auditStructure()
+          : Promise.reject(new Error('The active editor changed. Reopen the panel.')),
         onDismissFinding: (index) => {
           const finding = findings[index];
           if (!finding) return;
@@ -346,13 +335,20 @@ async function main(): Promise<void> {
 
       agent.balloon.render(panel.el);
       releasePanel?.();
-      releasePanel = makePanelMovable(agent.balloon, panel.handle, (await loadLayout()).panel);
+      releasePanel = makePanelMovable(agent.balloon, panel.handle, savedLayout.panel);
       panel.focus();
       void agent.play(findings.length > 0 ? 'Explain' : 'Congratulate');
-    })();
+    })().catch(() => {
+      if (disposed || generation !== panelGeneration) return;
+      closePanel();
+      agent.balloon.say('Could not read this document. Try again.');
+    });
   }
 
   function closePanel(): void {
+    panelGeneration++;
+    panel?.dispose();
+    highlighter.clear();
     releasePanel?.();
     releasePanel = undefined;
     agent.balloon.hide();
@@ -369,23 +365,21 @@ async function main(): Promise<void> {
     openPanel();
   }
 
-  // Order matters: the producer subscribes before the renderer, so a breakpoint
-  // populates the queue before anything tries to drain it. Listener order is
-  // insertion order, which a Set guarantees.
-  detector.on(() => void runChecks());
+  // Refresh first, then let the renderer consider that same seam.
+  const stopChecks = detector.on((bp) => void runChecks(bp).catch(() => undefined));
 
   detector.start();
-  renderer.start();
-  agent.show();
-
-  void agent.play('Greeting');
-  agent.nudge('It looks like you are writing something. Click me if you want a hand.');
+  if (!hidden) {
+    agent.show();
+    void agent.play('Greeting');
+    agent.nudge('It looks like you are writing something. Click me if you want a hand.');
+  }
 
   // First run: right after the greeting, the one setup step that matters.
   void hasApiKey().then((hasKey) => {
-    if (hasKey) return;
-    setTimeout(() => {
-      if (agent.balloon.isLocked) return; // They already opened something.
+    if (hasKey || disposed || !agent.isVisible) return;
+    keyPromptTimer = setTimeout(() => {
+      if (disposed || !agent.isVisible || agent.balloon.isLocked) return; // They already opened something.
       void agent.play('GetAttention');
       agent.balloon.suggest(
         'Before I can help, I need your Claude API key. Paste it in Settings.',
@@ -405,36 +399,49 @@ async function main(): Promise<void> {
     }, KEY_PROMPT_DELAY_MS);
   });
 
-  const stopWatching = onSettingsChanged((next: Settings) => {
-    settings = next;
-    renderer.setMuted(isSilenced(settings));
-    if (!isActiveOn(settings, location.hostname)) teardown();
-  });
-
-  ext.runtime.onMessage.addListener((message: { type?: string }) => {
-    if (message?.type === 'mrclippy:toggle') {
-      if (agent.isVisible) agent.hide();
-      else agent.show();
+  const onMessage = (message: unknown): void => {
+    if (!message || typeof message !== 'object') return;
+    const type = (message as { type?: unknown }).type;
+    if (disposed) return;
+    if (type === 'mrclippy:toggle') {
+      if (agent.isVisible) {
+        closePanel();
+        agent.hide();
+      } else agent.show();
     }
-    if (message?.type === 'mrclippy:mute') {
-      void saveSettings({ muted: !settings.muted });
+    if (type === 'mrclippy:mute') {
+      void toggleMuted().catch(() => undefined);
     }
-  });
+  };
 
   function teardown(): void {
-    stopWatching();
+    if (disposed) return;
+    disposed = true;
+    closePanel();
+    if (keyPromptTimer !== undefined) clearTimeout(keyPromptTimer);
+    drafts.clear();
+    stopChecks();
     detector.stop();
     renderer.stop();
+    editHistory.dispose();
     source.dispose?.();
     highlighter.dispose();
     agent.destroy();
     host.destroy();
   }
 
-  window.addEventListener('pagehide', teardown);
+  return {
+    get hidden() { return !agent.isVisible; },
+    update(next) {
+      settings = next;
+      renderer.setMuted(isSilenced(settings));
+    },
+    message: onMessage,
+    dispose: teardown,
+  };
 }
 
-void main().catch((error: unknown) => {
-  // A broken character must never break the page it is sitting on.
-  console.warn('[mr-clippy] failed to start:', error);
-});
+// Word's editor is an iframe, so frames are allowed there and nowhere else.
+if (window.top === window.self || location.hostname.endsWith('.officeapps.live.com')) {
+  startPageLifecycle(mountRuntime, () => !!document.body && isWritingSurface(location));
+}

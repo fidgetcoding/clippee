@@ -1,4 +1,4 @@
-import { landed, locate } from './match';
+import { landed, locate, normalize } from './match';
 import {
   EVENT_REQUEST,
   EVENT_RESPONSE,
@@ -108,7 +108,7 @@ async function replace(
   text: string,
   near: number | undefined,
 ): Promise<EditOutcome> {
-  if (typeof api.getText !== 'function' || typeof api.setSelection !== 'function') {
+  if (typeof api.getText !== 'function' || typeof api.setSelection !== 'function' || typeof api.getSelection !== 'function') {
     return { applied: false, reason: 'unavailable' };
   }
 
@@ -119,6 +119,12 @@ async function replace(
 
   api.setSelection(hit.start + offset, hit.end + offset);
   await sleep(30);
+  // Selection belongs to the user too. Never paste after they moved the cursor
+  // or typed while the editor was settling.
+  const selected = firstRange(api.getSelection());
+  if (api.getText() !== before || selected?.start !== hit.start + offset || selected.end !== hit.end + offset) {
+    return { applied: false, reason: 'unavailable' };
+  }
   if (!paste(text)) return { applied: false, reason: 'unavailable' };
 
   for (let waited = 0; waited < 1_500; waited += 50) {
@@ -126,7 +132,7 @@ async function replace(
     const after = api.getText();
     if (after === before && find !== text) continue;
     const body = after.slice(markerOffset(after));
-    if (landed(body, hit.start, text)) return { applied: true, start: hit.start };
+    if (normalize(body) === normalize(before.slice(offset, hit.start + offset) + text + before.slice(hit.end + offset)) && landed(body, hit.start, text)) return { applied: true, start: hit.start };
   }
   return { applied: false, reason: 'unverified' };
 }
@@ -146,15 +152,24 @@ export function setFlag(id: string): void {
 }
 
 let cachedHandle: AnnotatedText | undefined;
+let cachedFactory: Window['_docs_annotate_getAnnotatedText'];
+let cachedUrl = '';
 
 async function annotated(id: string): Promise<AnnotatedText | undefined> {
-  if (cachedHandle) return cachedHandle;
   const factory = window._docs_annotate_getAnnotatedText;
+  if (cachedHandle && factory === cachedFactory && cachedUrl === location.href) return cachedHandle;
+  cachedHandle = undefined;
+  cachedFactory = factory;
+  const url = location.href;
+  cachedUrl = url;
   if (typeof factory !== 'function') return undefined;
   try {
     const handle = await factory(id);
-    if (handle && typeof handle === 'object') {
-      cachedHandle = handle;
+    if (handle && typeof handle === 'object' && typeof handle.getText === 'function') {
+      // An earlier navigation can resolve after the current document's handle.
+      if (window._docs_annotate_getAnnotatedText === factory && location.href === url) {
+        cachedHandle = handle;
+      }
       return handle;
     }
   } catch {

@@ -185,6 +185,30 @@ describe('Docs bridge edits', () => {
     client.dispose();
   });
 
+  it('serializes simultaneous replacements so neither paste steals the other selection', async () => {
+    doc = '\u0003alpha beta gamma\n';
+    const client = new DocsBridgeClient();
+    const results = await Promise.all([
+      client.replace('alpha', 'A'),
+      client.replace('gamma', 'G'),
+    ]);
+    expect(doc).toBe('\u0003A beta G\n');
+    expect(results.every((r) => r.applied)).toBe(true);
+    client.dispose();
+  });
+
+  it('does not paste if the user changes selection while Docs is settling', async () => {
+    doc = '\u0003alpha beta gamma\n';
+    const client = new DocsBridgeClient();
+    const pending = client.replace('alpha', 'A');
+    await new Promise((r) => setTimeout(r, 10));
+    selection = { start: 12, end: 17 };
+    const result = await pending;
+    expect(doc).toBe('\u0003alpha beta gamma\n');
+    expect(result.applied).toBe(false);
+    client.dispose();
+  });
+
   it('leaves the document alone when the passage is ambiguous', async () => {
     doc = '\u0003the end. the end.\n';
     const client = new DocsBridgeClient();

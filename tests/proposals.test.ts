@@ -234,3 +234,24 @@ describe('one fix at a time', () => {
     vi.useRealTimers();
   });
 });
+
+describe('panel disposal', () => {
+  it('stops queued prefetch and hover work after closing', async () => {
+    let finish!: (reply: { text: string }) => void;
+    const onAsk = vi.fn(() => new Promise<{ text: string }>((resolve) => { finish = resolve; }));
+    const onLocate = vi.fn();
+    const p = panel({
+      findings: [{ text: 'First', anchor: 'first' }, { text: 'Second', anchor: 'second' }],
+      prefetch: true, onAsk, onLocate,
+    });
+    p.el.querySelector('.mrclippy-finding')?.dispatchEvent(new MouseEvent('mouseenter'));
+    expect(onAsk).toHaveBeenCalledTimes(1);
+    p.dispose();
+    finish({ text: 'Late reply' });
+    await flush();
+    await flush();
+    expect(onAsk).toHaveBeenCalledTimes(1);
+    expect(onLocate).not.toHaveBeenCalled();
+    expect(p.el.textContent).not.toContain('Late reply');
+  });
+});

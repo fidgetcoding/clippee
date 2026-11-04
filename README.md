@@ -89,7 +89,7 @@ Then click the extension icon, paste your Anthropic API key, and open a Google D
 
 ```bash
 npm run dev         # watch mode
-npm test            # 126 tests
+npm test            # regression suite
 npm run typecheck
 ```
 

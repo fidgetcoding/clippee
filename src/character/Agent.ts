@@ -39,6 +39,8 @@ export class Agent {
   private position: { x: number; y: number };
   private dragOrigin: { x: number; y: number; px: number; py: number } | undefined;
   private shown = false;
+  private destroyed = false;
+  private hideTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     pack: LoadedPack,
@@ -77,7 +79,7 @@ export class Agent {
     this.animator = new Animator(this.sprite, pack);
     this.balloon = new Balloon(this.root);
 
-    this.queue = new Queue(() => this.idle.schedule());
+    this.queue = new Queue(() => { if (this.shown && !this.destroyed) this.idle.schedule(); });
     this.idle = new IdleScheduler(
       this.animator.animations().filter((n) => n.startsWith('Idle')),
       (name) => this.animator.play(name),
@@ -114,7 +116,9 @@ export class Agent {
   }
 
   show(): void {
-    if (this.shown) return;
+    if (this.shown || this.destroyed) return;
+    if (this.hideTimer !== undefined) clearTimeout(this.hideTimer);
+    this.hideTimer = undefined;
     this.shown = true;
     this.root.hidden = false;
     if (this.animator.has('Show')) this.play('Show');
@@ -127,6 +131,8 @@ export class Agent {
    * long animation ahead of Hide is what made the X look broken.
    */
   hide(immediate = false): void {
+    if (this.hideTimer !== undefined) clearTimeout(this.hideTimer);
+    this.hideTimer = undefined;
     this.shown = false;
     this.idle.cancel();
     this.balloon.hide();
@@ -137,7 +143,9 @@ export class Agent {
       return;
     }
     const finish = (): void => {
-      if (this.shown) return;
+      if (this.hideTimer !== undefined) clearTimeout(this.hideTimer);
+      this.hideTimer = undefined;
+      if (this.shown || this.destroyed) return;
       this.animator.stop();
       this.root.hidden = true;
     };
@@ -152,13 +160,13 @@ export class Agent {
       }
     });
     // Backstop in case the exit animation never reports back.
-    setTimeout(finish, HIDE_BACKSTOP_MS);
+    if (!this.root.hidden) this.hideTimer = setTimeout(finish, HIDE_BACKSTOP_MS);
   }
 
   /** Queue an animation. Resolves when it finishes or is skipped. */
   play(name: string): Promise<void> {
     return new Promise((resolve) => {
-      if (!this.animator.has(name)) {
+      if (this.destroyed || !this.animator.has(name)) {
         resolve();
         return;
       }
@@ -172,7 +180,7 @@ export class Agent {
           if (state === AnimatorState.Exited) finish();
         });
         if (!started) finish();
-      });
+      }, resolve);
     });
   }
 
@@ -187,6 +195,7 @@ export class Agent {
 
   /** Queue a spoken line. `holdMs` of 0 leaves the balloon open. */
   speak(text: string, holdMs = 0): Promise<void> {
+    if (this.destroyed) return Promise.resolve();
     return new Promise((resolve) => {
       this.queue.push((done) => {
         // The balloon refuses this while locked, but skip the hide-timer too —
@@ -198,7 +207,7 @@ export class Agent {
         }
         done();
         resolve();
-      });
+      }, resolve);
     });
   }
 
@@ -218,8 +227,13 @@ export class Agent {
   }
 
   destroy(): void {
+    this.destroyed = true;
+    this.shown = false;
+    if (this.hideTimer !== undefined) clearTimeout(this.hideTimer);
+    this.hideTimer = undefined;
+    this.balloon.hide();
     this.idle.cancel();
-    this.queue.clear();
+    this.queue.reset();
     this.animator.stop();
     this.root.remove();
     this.balloon.el.remove();
