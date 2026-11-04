@@ -27,13 +27,14 @@ export interface TitleBar {
   readonly back: HTMLButtonElement;
   readonly title: HTMLElement;
   readonly settings: HTMLButtonElement;
+  readonly close: HTMLButtonElement;
 }
 
 /**
  * The top ribbon, which is also the drag handle. On the notes it reads
  * "Mr. Clippy" with Settings as its only control; inside a thread it reads
- * "< Notes" and the thread's title. There is deliberately no close button:
- * clicking him or pressing Escape closes the panel.
+ * "< Notes" and the thread's title. The X closes the panel (so do clicking
+ * him and Escape); he stays on the page.
  */
 export function buildTitleBar(options: ChatPanelOptions): TitleBar {
   const el = document.createElement('div');
@@ -51,10 +52,14 @@ export function buildTitleBar(options: ChatPanelOptions): TitleBar {
   const settings = button('Settings', 'mrclippy-btn-sm mrclippy-titlebtn-settings');
   settings.title = 'Settings: API key, mute, snooze';
   settings.addEventListener('click', () => options.onSettings());
-  right.appendChild(settings);
+  const close = button('\u2715', 'mrclippy-btn-sm mrclippy-titlebtn-close');
+  close.title = 'Close';
+  close.setAttribute('aria-label', 'Close');
+  close.addEventListener('click', () => options.onClose());
+  right.append(settings, close);
 
   el.append(back, title, right);
-  return { el, back, title, settings };
+  return { el, back, title, settings, close };
 }
 
 /** A Win98 checkbox drawn as a toggle button, so it styles the same everywhere. */

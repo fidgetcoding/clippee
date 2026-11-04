@@ -20,13 +20,19 @@ const labels = (root: HTMLElement) =>
   [...root.querySelectorAll('button')].map((b) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim());
 
 describe('title ribbon', () => {
-  it('has Settings as its only control: no close, no "Just let me write"', () => {
+  it('has Settings and a close X, and no "Just let me write"', () => {
     const p = panel();
     const bar = p.handle;
     const visible = [...bar.querySelectorAll('button')].filter((b) => !b.hidden);
-    expect(visible.map((b) => b.textContent)).toEqual(['Settings']);
-    const all = labels(p.el).join('|');
-    expect(all).not.toMatch(/close|just let me write|✕|–/i);
+    expect(visible.map((b) => b.textContent)).toEqual(['Settings', '\u2715']);
+    expect(labels(p.el).join('|')).not.toMatch(/just let me write|–/i);
+  });
+
+  it('the X closes the panel', () => {
+    const onClose = vi.fn();
+    const p = panel({ onClose });
+    p.handle.querySelector<HTMLButtonElement>('.mrclippy-titlebtn-close')?.click();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it('Settings opens settings', () => {

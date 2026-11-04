@@ -94,6 +94,7 @@ async function main(): Promise<void> {
     onMoved: (position) => void saveLayout({ agent: position }),
     onClick: () => onAgentClick(),
     onDismiss: () => {
+      closePanel();
       agent.hide();
       void saveSettings({ snoozeUntil: Date.now() + HIDE_DURATION_MS });
     },
@@ -338,7 +339,7 @@ async function main(): Promise<void> {
           queue.dismiss(finding.kind);
           void ext.storage.local.set({ [DISMISSAL_KEY]: queue.dismissalState() });
         },
-        // Escape. Snooze lives in Settings now, not on the panel.
+        // The title-bar X and Escape. Snooze lives in Settings, not on the panel.
         onClose: closePanel,
         onSettings: openSettings,
       });

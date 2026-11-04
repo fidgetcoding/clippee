@@ -4,6 +4,9 @@ import { IdleScheduler } from './IdleScheduler';
 import { Queue } from './Queue';
 import { AnimatorState, type LoadedPack } from './types';
 
+/** Longest he can take to leave before he is just removed. */
+const HIDE_BACKSTOP_MS = 2_000;
+
 export interface AgentOptions {
   /** Starting viewport position, in pixels. */
   readonly position?: { x: number; y: number };
@@ -118,24 +121,38 @@ export class Agent {
     else this.idle.schedule();
   }
 
-  /** `immediate` skips the exit animation — use it for Escape. */
+  /**
+   * `immediate` skips the exit animation — use it for Escape. Either way he
+   * goes now: whatever was playing is cut off rather than waited on, because a
+   * long animation ahead of Hide is what made the X look broken.
+   */
   hide(immediate = false): void {
     this.shown = false;
     this.idle.cancel();
     this.balloon.hide();
+    this.queue.reset();
+    this.animator.stop();
     if (immediate || !this.animator.has('Hide')) {
-      this.animator.stop();
       this.root.hidden = true;
       return;
     }
-    this.queue.clear();
+    const finish = (): void => {
+      if (this.shown) return;
+      this.animator.stop();
+      this.root.hidden = true;
+    };
     this.queue.push((done) => {
-      this.animator.play('Hide', () => {
-        this.animator.stop();
-        this.root.hidden = true;
+      const started = this.animator.play('Hide', () => {
+        finish();
         done();
       });
+      if (!started) {
+        finish();
+        done();
+      }
     });
+    // Backstop in case the exit animation never reports back.
+    setTimeout(finish, HIDE_BACKSTOP_MS);
   }
 
   /** Queue an animation. Resolves when it finishes or is skipped. */

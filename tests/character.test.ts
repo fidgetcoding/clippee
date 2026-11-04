@@ -129,6 +129,24 @@ describe('IdleScheduler cadence', () => {
 });
 
 describe('Queue', () => {
+  it('reset() drops a stuck running task, and its late done() is ignored', () => {
+    const queue = new Queue(() => {});
+    let staleDone: (() => void) | undefined;
+    queue.push((done) => (staleDone = done));
+    const second = vi.fn();
+    queue.push(second);
+    queue.reset();
+    expect(queue.busy).toBe(false);
+    const fresh = vi.fn();
+    queue.push(fresh);
+    expect(fresh).toHaveBeenCalledTimes(1);
+    const after = vi.fn();
+    queue.push(after);
+    staleDone?.();
+    expect(after).not.toHaveBeenCalled();
+    expect(second).not.toHaveBeenCalled();
+  });
+
   it('ignores a second done() so animations cannot interleave', () => {
     const order: string[] = [];
     const q = new Queue(() => order.push('empty'));

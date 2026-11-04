@@ -34,8 +34,8 @@ const FIX_PLACEHOLDER = 'Ask about this fix, or tell me to change it…';
  *
  * The notes screen is home. Every fix and every question gets a thread of its
  * own, reached from its line in the list and left with "< Notes", so the list
- * stays a list. Nothing here is modal and there is no close button: clicking
- * him or pressing Escape puts it away.
+ * stays a list. Nothing here is modal: the title-bar X, clicking him, or
+ * Escape puts it away.
  */
 export class ChatPanel {
   readonly el: HTMLElement;
