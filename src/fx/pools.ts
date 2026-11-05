@@ -1,5 +1,6 @@
 import { drawFromBag, isBag, type BagState } from '../character/shuffleBag';
 import { ext } from '../platform';
+import { STORAGE_TIMEOUT_MS, within } from '../timeout';
 import type { FxKind } from './types';
 
 export { drawFromBag, type BagState };
@@ -39,22 +40,22 @@ export class FxDeck {
   }
 
   private async draw(kind: FxKind): Promise<string> {
+    // Never waits on storage for long: a read stranded by an extension reload
+    // would otherwise hold this draw, and every draw queued behind it, forever.
+    const stored = (await within(() => ext.storage.local.get(BAGS_KEY), STORAGE_TIMEOUT_MS))?.[BAGS_KEY] as
+      | Record<string, unknown>
+      | undefined;
     let bags = this.local;
-    try {
-      const stored = (await ext.storage.local.get(BAGS_KEY))[BAGS_KEY] as Record<string, unknown> | undefined;
-      if (stored && typeof stored === 'object') {
-        bags = {};
-        for (const k of ['appear', 'disappear'] as const) {
-          if (isBag(stored[k])) bags[k] = stored[k];
-        }
+    if (stored && typeof stored === 'object') {
+      bags = {};
+      for (const k of ['appear', 'disappear'] as const) {
+        if (isBag(stored[k])) bags[k] = stored[k];
       }
-    } catch {
-      // Keep the in-page bags.
     }
     const { id, state } = drawFromBag(bags[kind], POOLS[kind], this.random);
     this.local = { ...bags, [kind]: state };
     try {
-      await ext.storage.local.set({ [BAGS_KEY]: this.local });
+      void ext.storage.local.set({ [BAGS_KEY]: this.local }).catch(() => undefined);
     } catch {
       // Same: the in-page bags still rotate.
     }

@@ -21,6 +21,7 @@ import { ChatPanel, docTitleFrom, type AgentChange, type AgentReply } from './ch
 import type { ChatTurn, DocumentEdit } from '../agent/types';
 import type { PanelState, SnoozeLength } from '../agent/panelTools';
 import { DocEdits } from './docEdits';
+import { storageBag } from './bagStore';
 import { startPageLifecycle, type PageRuntime } from './pageLifecycle';
 import {
   GREETING_WAVE_FRAME, Presence, prefersReducedMotion, reportAway, returnWhenSeen,
@@ -73,6 +74,8 @@ async function mountRuntime(
 
   const agent = new Agent(pack, {
     ...(layout.agent ? { position: layout.agent } : {}),
+    // No idle repeats until all nine have played, across tabs and reloads.
+    idleStore: storageBag('mrclippy:idle-bag'),
     onMoved: (position) => void saveLayout({ agent: position }),
     onClick: () => onAgentClick(),
     // X: he leaves with an exit and comes back on his own, or with the toolbar

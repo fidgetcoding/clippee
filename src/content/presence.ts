@@ -1,5 +1,13 @@
 import type { FxKind, LabFx } from '../fx/types';
 import { ext } from '../platform';
+import { STORAGE_TIMEOUT_MS, within } from '../timeout';
+
+/**
+ * Longest the effects library may take to load the first time (a chunk from
+ * the extension, usually a few milliseconds). Past it, this entrance or exit
+ * goes plain and the load carries on for the next one.
+ */
+export const EFFECTS_TIMEOUT_MS = 2_000;
 
 /** After X, he comes back on his own. Nate: "he should always reappear again after a certain amount of time". */
 export const RETURN_AFTER_MS = 5 * 60_000;
@@ -110,6 +118,9 @@ export class Presence {
   private returnTimer: ReturnType<typeof setTimeout> | undefined;
   private stopWatching: (() => void) | undefined;
   private library: Readonly<Record<string, LabFx>> | undefined;
+  private libraryLoad: Promise<Readonly<Record<string, LabFx>>> | undefined;
+  /** Resets him if an effect is still "running" long after any could. */
+  private watchdog: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly options: PresenceOptions) {}
 
@@ -147,6 +158,7 @@ export class Presence {
     if (this.disposed) return;
     this.generation++;
     this.busy = false;
+    this.clearWatchdog();
     this.options.player.cancel();
     this.clearReturn();
     this.options.agent.hide(true);
@@ -187,7 +199,13 @@ export class Presence {
   dispose(): void {
     this.disposed = true;
     this.clearReturn();
+    this.clearWatchdog();
     this.options.player.cancel();
+  }
+
+  private clearWatchdog(): void {
+    if (this.watchdog !== undefined) clearTimeout(this.watchdog);
+    this.watchdog = undefined;
   }
 
   private scheduleReturn(): void {
@@ -237,8 +255,17 @@ export class Presence {
       this.busy = true;
       this.busySince = (this.options.now ?? Date.now)();
       const generation = this.generation;
+      // Nothing below should be able to hang, but if anything ever does, he
+      // does not stay hidden waiting for someone to click: he is reset to
+      // wherever he was last asked to be.
+      this.clearWatchdog();
+      this.watchdog = setTimeout(() => {
+        this.watchdog = undefined;
+        if (generation === this.generation && this.busy && !this.disposed) this.force(this.wanted);
+      }, STUCK_AFTER_MS);
       void this.animate(target, generation).finally(() => {
         if (generation !== this.generation) return;
+        this.clearWatchdog();
         this.busy = false;
         this.run();
       });
@@ -256,10 +283,16 @@ export class Presence {
     // He is drawn on the overlay for the whole effect; his sprite stays out of the way.
     this.agentHide();
     try {
-      const id = await this.options.next(kind);
-      this.library ??= await this.options.effects();
-      const fx = this.library[id];
-      if (fx && !this.disposed) await this.options.player.play(fx, kind, anchor);
+      // Each wait is bounded: storage stranded by an extension reload never answers.
+      const id = await within(() => this.options.next(kind), STORAGE_TIMEOUT_MS);
+      // A load that failed is tried again next time, not remembered as failed.
+      this.libraryLoad ??= Promise.resolve().then(() => this.options.effects()).catch((error: unknown) => {
+        this.libraryLoad = undefined;
+        throw error;
+      });
+      this.library ??= await within(this.libraryLoad, EFFECTS_TIMEOUT_MS);
+      const fx = id === undefined ? undefined : this.library?.[id];
+      if (fx && !this.disposed && generation === this.generation) await this.options.player.play(fx, kind, anchor);
     } catch {
       // No effect this time. He still goes where he was going.
     }
