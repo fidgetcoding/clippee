@@ -14,7 +14,7 @@ export default defineManifest({
   manifest_version: 3,
   name: 'Clippee by Microshaft',
   version: '0.1.0',
-  description: 'A writing agent behind the paperclip.',
+  description: 'The paperclip is back, and this time he read your doc. Notes and one-click fixes for Google Docs, Word, and Notion.',
 
   permissions: ['storage', 'tabs'],
 
@@ -23,7 +23,7 @@ export default defineManifest({
   // nothing at all.
   action: {
     default_popup: 'src/popup/index.html',
-    default_title: 'Clippee',
+    default_title: 'Clippee by Microshaft',
   },
 
   // Cross-origin requests go only to the model API and the dormant Drive client.
