@@ -14,18 +14,19 @@ import {
  * differences from the original, all deliberate:
  *  - the step loop can actually be stopped (`stop()`); the original leaves a
  *    `setTimeout` chain running for the lifetime of the page
- *  - sounds are opt-in and default to muted
+ *  - no sound at all: a pack's sound keys are ignored
  *  - guards against a zero-frame animation instead of producing NaN indices
  */
 export class Animator {
   private readonly overlays: HTMLElement[] = [];
-  private readonly sounds = new Map<string, HTMLAudioElement>();
 
   private currentAnimation: Animation | undefined;
   private currentFrame: Frame | undefined;
   private currentFrameIndex = 0;
   /** Where the next animation begins. Usually 0. */
   private startIndex = 0;
+  /** Ignore the opening frame's dice roll (see `play`). */
+  private committed = false;
   private exiting = false;
   private started = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -33,9 +34,6 @@ export class Animator {
 
   /** Name of the animation currently playing, if any. */
   currentAnimationName: string | undefined;
-
-  /** When false, `sound` keys on frames are ignored. */
-  soundEnabled = false;
 
   constructor(
     private readonly root: HTMLElement,
@@ -73,23 +71,19 @@ export class Animator {
     return Object.hasOwn(this.pack.data.animations, name);
   }
 
-  /** Register audio for frames that reference a sound key. */
-  preloadSounds(urls: Readonly<Record<string, string>>): void {
-    for (const key of this.pack.data.sounds) {
-      const url = urls[key];
-      if (url) this.sounds.set(key, new Audio(url));
-    }
-  }
-
   /**
    * Begin `name`. Returns false if the pack has no such animation.
    * `onEnd` fires once the animation reaches its final frame. `from` skips
    * ahead to that frame, for an animation whose opening is already on screen.
+   * `committed` ignores a branch on the opening frame: in the 1997 timings
+   * most idles roll there to skip straight to the end (IdleAtom does 97 times
+   * in 100), which reads as him doing nothing at all.
    */
-  play(name: string, onEnd?: AnimationEndCallback, from = 0): boolean {
+  play(name: string, onEnd?: AnimationEndCallback, from = 0, committed = false): boolean {
     const animation = this.pack.data.animations[name];
     if (!animation || animation.frames.length === 0) return false;
     this.startIndex = Math.min(Math.max(0, Math.floor(from)), animation.frames.length - 1);
+    this.committed = committed;
 
     this.exiting = false;
     this.currentAnimation = animation;
@@ -153,7 +147,7 @@ export class Animator {
 
     if (this.exiting && frame.exitBranch !== undefined) return frame.exitBranch;
 
-    if (frame.branching) {
+    if (frame.branching && !(this.committed && this.currentFrameIndex === 0)) {
       let roll = Math.random() * 100;
       for (const branch of frame.branching.branches) {
         if (roll <= branch.weight) return branch.frameIndex;
@@ -179,15 +173,6 @@ export class Animator {
     }
   }
 
-  private playSound(): void {
-    if (!this.soundEnabled) return;
-    const key = this.currentFrame?.sound;
-    if (!key) return;
-    void this.sounds.get(key)?.play().catch(() => {
-      // Autoplay policy can reject; a silent character is better than a thrown error.
-    });
-  }
-
   private step(): void {
     const animation = this.currentAnimation;
     if (!animation) return;
@@ -204,7 +189,6 @@ export class Animator {
     }
 
     this.draw();
-    this.playSound();
 
     if (this.atLastFrame() && (!animation.useExitBranching || this.exiting)) {
       // Hold the final pixels without waking the page forever. Clear state

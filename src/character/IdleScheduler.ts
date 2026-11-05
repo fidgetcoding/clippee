@@ -1,3 +1,5 @@
+import { ShuffleBag, type BagStore } from './shuffleBag';
+
 /**
  * Picks idle animations and decides when the next one fires.
  *
@@ -12,6 +14,8 @@ export interface IdleSchedulerOptions {
   readonly intervalMs?: number;
   /** Source of randomness. Injectable so the cadence can be tested. */
   readonly random?: () => number;
+  /** Where the idle bag keeps its place between pages. */
+  readonly store?: BagStore;
 }
 
 const DEFAULT_INTERVAL_MS = 4_000;
@@ -20,15 +24,16 @@ export class IdleScheduler {
   private readonly intervalMs: number;
   private readonly random: () => number;
   private timer: ReturnType<typeof setTimeout> | undefined;
-  private lastPlayed: string | undefined;
+  private readonly bag: ShuffleBag;
 
   constructor(
-    private readonly idleNames: readonly string[],
+    idleNames: readonly string[],
     private readonly play: (name: string) => void,
     options: IdleSchedulerOptions = {},
   ) {
     this.intervalMs = options.intervalMs ?? DEFAULT_INTERVAL_MS;
     this.random = options.random ?? Math.random;
+    this.bag = new ShuffleBag(idleNames, options.store, this.random);
   }
 
   /**
@@ -40,18 +45,11 @@ export class IdleScheduler {
   }
 
   /**
-   * Choose an idle animation, avoiding an immediate repeat so the same gesture
-   * never fires twice in a row when several are available.
+   * Choose an idle animation from the bag: every idle plays once before any
+   * plays again, and never the same one twice in a row.
    */
   pick(): string | undefined {
-    if (this.idleNames.length === 0) return undefined;
-    if (this.idleNames.length === 1) return this.idleNames[0];
-
-    const candidates = this.idleNames.filter((n) => n !== this.lastPlayed);
-    const pool = candidates.length > 0 ? candidates : this.idleNames;
-    const chosen = pool[Math.floor(this.random() * pool.length) % pool.length];
-    this.lastPlayed = chosen;
-    return chosen;
+    return this.bag.next();
   }
 
   /** Schedule the next idle. Safe to call repeatedly; only one timer is live. */

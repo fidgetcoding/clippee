@@ -114,11 +114,8 @@ describe('IdleScheduler cadence', () => {
 
   it('avoids playing the same idle twice in a row', () => {
     const s = new IdleScheduler(['A', 'B'], () => {}, { random: () => 0 });
-    const first = s.pick();
-    const second = s.pick();
-
-    expect(first).toBe('A');
-    expect(second).toBe('B');
+    const picks = Array.from({ length: 10 }, () => s.pick());
+    for (let i = 1; i < picks.length; i++) expect(picks[i]).not.toBe(picks[i - 1]);
   });
 
   it('repeats when only one idle exists rather than returning nothing', () => {

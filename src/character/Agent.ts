@@ -2,10 +2,18 @@ import { Animator } from './Animator';
 import { Balloon } from './Balloon';
 import { IdleScheduler } from './IdleScheduler';
 import { Queue } from './Queue';
+import type { BagStore } from './shuffleBag';
 import { AnimatorState, type LoadedPack } from './types';
 
 /** Longest he can take to leave before he is just removed. */
 const HIDE_BACKSTOP_MS = 2_000;
+
+/**
+ * Longest an idle runs before it is asked to wind down. Several of the 1997
+ * idles loop until told to stop (the finger tap, the rope pile), which left
+ * him tapping one finger for minutes.
+ */
+const IDLE_MAX_MS = 6_000;
 
 export interface AgentOptions {
   /** Starting viewport position, in pixels. */
@@ -16,6 +24,8 @@ export interface AgentOptions {
   readonly onDismiss?: () => void;
   /** After a drag ends, with where he was dropped. Used to remember the spot. */
   readonly onMoved?: (position: { x: number; y: number }) => void;
+  /** Where the idle bag keeps its place, so no idle repeats until all have played. */
+  readonly idleStore?: BagStore;
 }
 
 /**
@@ -41,6 +51,7 @@ export class Agent {
   private shown = false;
   private destroyed = false;
   private hideTimer: ReturnType<typeof setTimeout> | undefined;
+  private idleCap: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     pack: LoadedPack,
@@ -80,10 +91,16 @@ export class Agent {
     this.balloon = new Balloon(this.root);
 
     this.queue = new Queue(() => { if (this.shown && !this.destroyed) this.idle.schedule(); });
+    // Idles play straight on the animator, not through the queue, so the queue
+    // never hears one finish. Each idle books the next itself when it ends;
+    // anything else he does cuts it off and the queue books the next instead.
     this.idle = new IdleScheduler(
       this.animator.animations().filter((n) => n.startsWith('Idle')),
-      (name) => this.animator.play(name),
-      options.idleIntervalMs !== undefined ? { intervalMs: options.idleIntervalMs } : {},
+      (name) => this.playIdle(name),
+      {
+        ...(options.idleIntervalMs !== undefined ? { intervalMs: options.idleIntervalMs } : {}),
+        ...(options.idleStore ? { store: options.idleStore } : {}),
+      },
     );
 
     const fallback = {
@@ -100,6 +117,25 @@ export class Agent {
     this.applyPosition();
 
     this.wireInteraction(options.onClick, options.onMoved);
+  }
+
+  /**
+   * One idle, for real (no opening roll to skip it), wound down after a few
+   * seconds, and booking the next when it ends.
+   */
+  private playIdle(name: string): void {
+    if (this.idleCap !== undefined) clearTimeout(this.idleCap);
+    const started = this.animator.play(name, (_n, state) => {
+      if (state !== AnimatorState.Exited) return;
+      if (this.idleCap !== undefined) clearTimeout(this.idleCap);
+      this.idleCap = undefined;
+      if (this.shown && !this.destroyed && !this.queue.busy) this.idle.schedule();
+    }, 0, true);
+    if (!started) return;
+    this.idleCap = setTimeout(() => {
+      this.idleCap = undefined;
+      if (this.animator.currentAnimationName === name) this.animator.exit();
+    }, IDLE_MAX_MS);
   }
 
   /** Animation names available in the loaded pack. */
@@ -277,6 +313,8 @@ export class Agent {
   destroy(): void {
     this.destroyed = true;
     this.shown = false;
+    if (this.idleCap !== undefined) clearTimeout(this.idleCap);
+    this.idleCap = undefined;
     if (this.hideTimer !== undefined) clearTimeout(this.hideTimer);
     this.hideTimer = undefined;
     this.balloon.hide();
