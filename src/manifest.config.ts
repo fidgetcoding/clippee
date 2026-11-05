@@ -16,6 +16,15 @@ export default defineManifest({
   version: '0.1.0',
   description: 'The paperclip is back, and this time he read your doc. Notes and one-click fixes for Google Docs.',
 
+  // The Microshaft mark. 16 and 32 are hand-tuned bitmaps; a downscaled vector
+  // blurs the gutters into the tiles at toolbar size.
+  icons: {
+    16: 'src/icons/icon-16.png',
+    32: 'src/icons/icon-32.png',
+    48: 'src/icons/icon-48.png',
+    128: 'src/icons/icon-128.png',
+  },
+
   permissions: ['storage', 'tabs'],
 
   // Without this key `chrome.action` is undefined, and the background script's
@@ -24,6 +33,10 @@ export default defineManifest({
   action: {
     default_popup: 'src/popup/index.html',
     default_title: 'Clippee by Microshaft',
+    default_icon: {
+      16: 'src/icons/icon-16.png',
+      32: 'src/icons/icon-32.png',
+    },
   },
 
   // Cross-origin requests go only to the model API and the dormant Drive client.
