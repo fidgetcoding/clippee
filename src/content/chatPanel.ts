@@ -5,6 +5,7 @@ import { buildAskArea, buildChips, buildTitleBar, type AskArea, type TitleBar } 
 import { matchCommand } from './localCommands';
 import { wireNotes, type NoteEntry } from './noteControls';
 import { NotesView, type QuestionRow } from './notesView';
+import { openHistory, settleReceipts, type HistoryScreen } from './historyView';
 import { describePanel, runActions, type PanelHost, type QuestionEntry } from './panelActions';
 import {
   describeForHistory,
@@ -58,6 +59,7 @@ export class ChatPanel {
   private active: Thread;
   private readonly fixes = new Map<number, Thread>();
   private fixAllThread: Thread | undefined;
+  private historyThread: { thread: Thread; screen: HistoryScreen } | undefined;
   private readonly controls: NoteEntry[];
   private readonly fixAll: () => FixAllBar | undefined;
   private readonly asked: AskedEntry[] = [];
@@ -83,6 +85,7 @@ export class ChatPanel {
     this.title = buildTitleBar(options);
     this.handle = this.title.el;
     this.title.back.addEventListener('click', () => this.show(this.main));
+    this.title.history.addEventListener('click', () => this.showHistory());
     this.el.appendChild(this.handle);
 
     const body = document.createElement('div');
@@ -127,7 +130,7 @@ export class ChatPanel {
     this.notes = new NotesView(options.findings.length, options.docTitle, (on) =>
       this.el.classList.toggle('mrclippy-hide-fixed', on),
     );
-    this.main = this.newThread('Clippee');
+    this.main = this.newThread('Clippee by Microshaft');
     this.main.log.appendChild(this.notes.el);
     this.active = this.main;
     this.viewport.appendChild(this.main.log);
@@ -143,6 +146,9 @@ export class ChatPanel {
       fixAll: () => this.fixAll(),
       results: () => this.fixAllThread,
       threads: () => [...this.fixes.values(), ...this.asked.filter((q) => !q.removed).map((q) => q.thread)],
+      history: () => this.historyThread?.thread,
+      historyScreen: () => this.historyThread?.screen,
+      showHistory: () => this.showHistory(),
       show: (thread) => this.show(thread),
       audit: () => void this.runAudit(),
     };
@@ -162,6 +168,7 @@ export class ChatPanel {
 
   dispose(): void {
     this.disposed = true;
+    this.historyThread?.screen.dispose();
     for (const timer of this.hoverTimers) clearTimeout(timer);
     this.hoverTimers.clear();
     this.el.remove();
@@ -175,6 +182,7 @@ export class ChatPanel {
     title: string,
     onStatus?: (state: ThreadState) => void,
     quiet = false,
+    origin?: string,
   ): Thread {
     const log = document.createElement('div');
     log.className = 'mrclippy-log';
@@ -185,8 +193,26 @@ export class ChatPanel {
       busy: false,
       ...(onStatus ? { onStatus: (state: ThreadState) => { thread.state = state; onStatus(state); } } : {}),
       ...(quiet ? { quiet } : {}),
+      ...(origin ? { origin } : {}),
     };
     return thread;
+  }
+
+  /** The History screen, from the title bar or the chat. Read again on every open. */
+  private showHistory(): HistoryScreen | undefined {
+    const api = this.options.history;
+    if (!api || this.disposed) return undefined;
+    this.historyThread ??= openHistory(api, this.newThread('History', undefined, true), {
+      // The History moved these changes in the doc; every receipt holding exactly them follows.
+      afterSwap: async (ids, direction) => settleReceipts(this.options.liveChanges?.(ids) ?? [], [
+        ...this.host.threads().flatMap((t) => t.receipts ?? []),
+        ...(this.fixAllThread?.results ? [this.fixAllThread.results] : []),
+      ], direction),
+      pointsAt: (el, passage) => this.pointsAt(el, passage),
+    });
+    this.show(this.historyThread.thread);
+    void this.historyThread.screen.refresh();
+    return this.historyThread.screen;
   }
 
   /** A new chat, listed under "Your questions" so it can be reopened like a fix. */
@@ -196,7 +222,7 @@ export class ChatPanel {
     const thread = this.newThread(title, (state) => {
       if (entry) entry.state = state;
       row.setState(state);
-    });
+    }, false, `Asked: ${title}`);
     entry = { thread, title, row, state: undefined, removed: false };
     this.asked.push(entry);
     return thread;
@@ -218,7 +244,9 @@ export class ChatPanel {
     this.el.dataset.view = inThread ? 'thread' : 'notes';
     this.title.back.hidden = !inThread;
     this.title.settings.hidden = inThread;
-    this.title.title.textContent = thread.title;
+    this.title.history.hidden = inThread || !this.options.history;
+    if (inThread) this.title.title.textContent = thread.title;
+    else this.title.showName();
     this.title.title.title = inThread ? thread.title : '';
     // A fix thread talks about its fix; everywhere else the box is the general one.
     const isFix = [...this.fixes.values()].includes(thread);
@@ -296,7 +324,7 @@ export class ChatPanel {
     const existing = this.fixes.get(index);
     if (existing) return { thread: existing, started: undefined };
     const title = fixTitle(finding);
-    const thread = this.newThread(title, onStatus);
+    const thread = this.newThread(title, onStatus, false, title);
     this.fixes.set(index, thread);
     thread.drafting = this.submit(fixQuestion(finding), `Fix: ${title}`, thread);
     return { thread, started: thread.drafting };

@@ -1,5 +1,6 @@
 import type { PanelAction, PanelState, SnoozeLength } from '../agent/panelTools';
 import type { FixAllBar } from './changeCards';
+import type { HistoryScreen } from './historyView';
 import {
   noteLabel,
   type AgentChange,
@@ -47,6 +48,11 @@ export interface PanelHost {
   /** The Fix all result screen, once Fix all has run. */
   results(): Thread | undefined;
   threads(): readonly Thread[];
+  /** The History screen's thread, once opened. */
+  history(): Thread | undefined;
+  historyScreen(): HistoryScreen | undefined;
+  /** Open the History. Undefined where there is none. */
+  showHistory(): HistoryScreen | undefined;
   show(thread: Thread): void;
   audit(): void;
 }
@@ -66,13 +72,14 @@ function noteStatus(host: PanelHost, c: NoteControl): string {
     case 'applied': return 'applied';
     case 'failed': return s.reason ? `failed: ${s.reason}` : 'failed';
     case 'answered': return 'no change';
+    case 'undone': return 'applied, then undone';
     case 'skipped': return 'skipped';
   }
 }
 
 const QUESTION_STATUS: Readonly<Record<ThreadState['kind'], string>> = {
   working: 'working', ready: 'changes to review', answered: 'answered', applied: 'applied',
-  skipped: 'skipped', failed: 'failed',
+  undone: 'undone', skipped: 'skipped', failed: 'failed',
 };
 
 /** Every receipt, plus Fix all's screen when it has an Undo all. */
@@ -89,7 +96,7 @@ export function describePanel(host: PanelHost, here: Thread = host.active()): Pa
   const bar = host.fixAll();
   const controls = controlsOf(host);
   return {
-    screen: here === host.main ? 'notes' : results ? 'fix-all' : fix ? 'fix' : 'question',
+    screen: here === host.main ? 'notes' : here === host.history() ? 'history' : results ? 'fix-all' : fix ? 'fix' : 'question',
     title: here.title,
     ...(fix ? { note: fix.index + 1 } : {}),
     notes: host.allNotes().filter((c) => !c.dismissed).map((c) => {
@@ -146,6 +153,13 @@ async function runAction(host: PanelHost, a: PanelAction, here: Thread): Promise
   const note = a.note === undefined ? undefined : host.allNotes()[a.note - 1];
   if (a.note !== undefined && (!note || note.dismissed)) return `I can't find note ${a.note}.`;
   const { options } = host;
+  // On the History screen, undo and redo mean its entries.
+  const onHistory = here === host.history() ? host.historyScreen() : undefined;
+  if (onHistory && !note) {
+    if (a.action === 'undo' || a.action === 'undo_last') return onHistory.undoLast();
+    if (a.action === 'undo_all') return onHistory.undoAll();
+    if (a.action === 'redo') return onHistory.redoAll();
+  }
 
   switch (a.action) {
     case 'hide_done':
@@ -240,9 +254,18 @@ async function runAction(host: PanelHost, a: PanelAction, here: Thread): Promise
         return (await results.undo()) ? `Took all ${plural(results.applied, 'change')} back out.` : "Couldn't undo that.";
       }
       const live = host.threads().flatMap((t) => t.receipts ?? []).filter((c) => !c.undone).reverse();
-      if (live.length === 0) return "There's nothing to undo.";
-      return (await each(live, (c) => c.undo())) ? 'Took every change back out.' : "Couldn't undo that.";
+      if (live.length > 0) return (await each(live, (c) => c.undo())) ? 'Took every change back out.' : "Couldn't undo that.";
+      // Nothing from this visit: everything the History still has in.
+      const history = options.history ? host.showHistory() : undefined;
+      return history ? history.undoAll() : "There's nothing to undo.";
     }
+    case 'undo_last': {
+      const history = options.history ? host.showHistory() : undefined;
+      return history ? history.undoLast() : "There's nothing to undo.";
+    }
+    case 'show_history':
+      if (!host.showHistory()) return "There's no History here.";
+      return "Here's every change I've made to this doc.";
     case 'redo': {
       const fallback = host.results()?.results;
       const pool = note ? note.thread()?.receipts ?? []

@@ -8,7 +8,7 @@
  * hitting. Only the snapshot varies, and it rides in the last user turn.
  */
 
-export type PanelScreen = 'notes' | 'fix' | 'fix-all' | 'question';
+export type PanelScreen = 'notes' | 'fix' | 'fix-all' | 'question' | 'history';
 
 export interface PanelNoteState {
   /** 1-based and stable for the panel's life: ignoring a note does not renumber the rest. */
@@ -43,7 +43,7 @@ export interface PanelState {
 export const PANEL_ACTIONS = [
   'hide_done', 'show_done', 'fix_all', 'show_results', 'apply', 'skip', 'open_note',
   'ignore_note', 'retry_note', 'undo', 'undo_all', 'redo', 'open_question', 'back',
-  'settings', 'snooze', 'mute', 'unmute', 'check_structure', 'close',
+  'settings', 'snooze', 'mute', 'unmute', 'check_structure', 'close', 'show_history', 'undo_last',
 ] as const;
 export type PanelActionName = (typeof PANEL_ACTIONS)[number];
 
@@ -98,7 +98,8 @@ export const PANEL_TOOL = {
                 'open_note: open a note\'s fix thread. ignore_note: never show that kind of note again.',
                 'retry_note: write a failed fix again.',
                 'undo: take back one note\'s applied fix (note), or the open thread\'s. undo_all: take back every change.',
-                'redo: put back what was undone.',
+                'undo_last: take back the most recent change he made to this doc, wherever it came from.',
+                'redo: put back what was undone. show_history: open the History of every change made to this doc.',
                 'open_question: reopen one of the user\'s questions (question). back: return to the notes.',
                 'settings: open Settings (API key, mute, snooze). snooze: no suggestions for a while (duration).',
                 'mute / unmute: stop or resume pop-up suggestions. check_structure: run the structure check.',
@@ -138,7 +139,7 @@ export function parsePanelCall(input: unknown): PanelAction[] {
   return actions.slice(0, MAX_ACTIONS);
 }
 
-const SCREENS: readonly PanelScreen[] = ['notes', 'fix', 'fix-all', 'question'];
+const SCREENS: readonly PanelScreen[] = ['notes', 'fix', 'fix-all', 'question', 'history'];
 const MAX_ROWS = 200;
 const str = (v: unknown): v is string => typeof v === 'string';
 
@@ -165,6 +166,7 @@ const SCREEN_NAMES: Readonly<Record<PanelScreen, string>> = {
   fix: 'a fix thread',
   'fix-all': 'the Fix all result screen',
   question: 'one of their questions',
+  history: 'the History of every change made to this doc',
 };
 
 /** The snapshot as the model reads it: short lines, numbers it can quote back. */

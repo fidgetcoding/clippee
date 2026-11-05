@@ -210,10 +210,10 @@ describe('he works his own panel from the chat', () => {
     expect(said(p)?.textContent).toBe('Applied the Hedge fix.');
 
     q<HTMLButtonElement>('.mrclippy-review')?.click();
-    expect(title(p)).not.toBe('Clippee');
+    expect(title(p)).not.toBe('Clippee by Microshaft');
     replies.push({ text: '', actions: [{ action: 'back' }] });
     await type('nvm take me back');
-    expect(title(p)).toBe('Clippee');
+    expect(title(p)).toBe('Clippee by Microshaft');
     expect(q<HTMLButtonElement>('.mrclippy-back')?.hidden).toBe(true);
     expect(said(p)?.textContent).toBe('Back to your notes.');
   });

@@ -11,6 +11,12 @@ export interface NoteHandlers {
     retry(): void;
     /** Without background drafting the button reads "Fix" until first opened. */
     readonly label: 'Fix' | 'Review';
+    /**
+     * An applied row's Undo, and Redo once it is out: the same path as the
+     * fix's own receipt. Resolves to a line to show when it couldn't.
+     */
+    undo(): Promise<string | undefined>;
+    redo(): Promise<string | undefined>;
   };
   dismiss(): void;
 }
@@ -167,6 +173,7 @@ export class NotesView {
     const review = button(fix?.label ?? 'Review', 'mrclippy-btn-sm mrclippy-review');
     review.title = 'See the before and after, or talk it through';
     const retry = button('Retry', 'mrclippy-btn-sm mrclippy-retry');
+    const undo = button('Undo', 'mrclippy-btn-sm mrclippy-row-undo');
     const bar = progressBar();
     const note = document.createElement('span');
     note.className = 'mrclippy-nr-note';
@@ -178,7 +185,21 @@ export class NotesView {
       apply.addEventListener('click', () => fix.apply());
       review.addEventListener('click', () => fix.review());
       retry.addEventListener('click', () => fix.retry());
-      ac.append(apply, review, retry, bar);
+      undo.addEventListener('click', () => {
+        const out = current?.kind === 'undone';
+        undo.disabled = true;
+        undo.textContent = out ? 'Redoing…' : 'Undoing…';
+        void (out ? fix.redo() : fix.undo()).then((problem) => {
+          // Success arrives as a new state from the receipt; this only resets the button.
+          draw(current);
+          if (problem) {
+            note.className = 'mrclippy-nr-note mrclippy-why';
+            note.textContent = problem;
+            ac.hidden = false;
+          }
+        });
+      });
+      ac.append(apply, review, undo, retry, bar);
     }
     ac.appendChild(note);
     let dropped = false;
@@ -213,7 +234,7 @@ export class NotesView {
             ? statusIcon('ok')
             : kind === 'failed'
               ? statusIcon('err')
-              : kind === 'answered' || kind === 'skipped'
+              : kind === 'answered' || kind === 'skipped' || kind === 'undone'
                 ? bullet(true)
                 : kind === 'ready'
                   ? statusIcon('bulb')
@@ -228,6 +249,8 @@ export class NotesView {
               ? 'Waiting'
             : kind === 'applied'
               ? 'Applied'
+              : kind === 'undone'
+                ? 'Undone'
               : kind === 'failed'
                 ? 'Failed'
                 : kind === 'answered'
@@ -236,8 +259,12 @@ export class NotesView {
                     ? 'Skipped'
                     : '';
       apply.hidden = kind !== 'ready';
-      review.hidden = !fix || waiting || kind === 'working' || kind === 'applied' || kind === 'failed';
+      review.hidden = !fix || waiting || kind === 'working' || kind === 'applied' || kind === 'undone' || kind === 'failed';
       retry.hidden = kind !== 'failed';
+      // Where Review sits on an open row: Undo on an applied one, Redo once it's out.
+      undo.hidden = !fix || (kind !== 'applied' && kind !== 'undone');
+      undo.disabled = false;
+      undo.textContent = kind === 'undone' ? 'Redo' : 'Undo';
       bar.hidden = kind !== 'working';
       ignore.hidden = kind === 'applied' || kind === 'working';
       note.className = `mrclippy-nr-note${kind === 'failed' ? ' mrclippy-why' : ''}`;
@@ -248,7 +275,7 @@ export class NotesView {
             ? `Not done. ${state.reason ?? 'Try again.'}`
             : '';
       ac.hidden =
-        !fix || (apply.hidden && review.hidden && retry.hidden && bar.hidden && note.textContent === '');
+        !fix || (apply.hidden && review.hidden && undo.hidden && retry.hidden && bar.hidden && note.textContent === '');
       this.states.set(row, state);
       this.refresh();
     };

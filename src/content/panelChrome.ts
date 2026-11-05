@@ -28,13 +28,16 @@ export interface TitleBar {
   readonly el: HTMLElement;
   readonly back: HTMLButtonElement;
   readonly title: HTMLElement;
+  readonly history: HTMLButtonElement;
   readonly settings: HTMLButtonElement;
   readonly close: HTMLButtonElement;
+  /** The full name, with "by Microshaft" a shade lighter, for the notes screen. */
+  showName(): void;
 }
 
 /**
  * The top ribbon, which is also the drag handle. On the notes it reads
- * "Clippee" with Settings as its only control; inside a thread it reads
+ * "Clippee by Microshaft" with History and Settings; inside a thread it reads
  * "< Notes" and the thread's title. The X closes the panel (so do clicking
  * him and Escape); he stays on the page.
  */
@@ -58,10 +61,19 @@ export function buildTitleBar(options: ChatPanelOptions): TitleBar {
 
   const title = document.createElement('span');
   title.className = 'mrclippy-title';
-  title.textContent = 'Clippee';
+  const showName = (): void => {
+    const by = document.createElement('span');
+    by.className = 'mrclippy-title-by';
+    by.textContent = 'by Microshaft';
+    title.replaceChildren('Clippee ', by);
+  };
+  showName();
 
   const right = document.createElement('span');
   right.className = 'mrclippy-titlebtns';
+  const history = button('History', 'mrclippy-btn-sm mrclippy-titlebtn-history');
+  history.title = 'Every change I\u2019ve made to this doc, with Undo';
+  history.hidden = !options.history;
   const settings = button('Settings', 'mrclippy-btn-sm mrclippy-titlebtn-settings');
   settings.title = 'Settings: API key, mute, snooze';
   settings.addEventListener('click', () => options.onSettings());
@@ -69,10 +81,10 @@ export function buildTitleBar(options: ChatPanelOptions): TitleBar {
   close.title = 'Close';
   close.setAttribute('aria-label', 'Close');
   close.addEventListener('click', () => options.onClose());
-  right.append(settings, close);
+  right.append(history, settings, close);
 
   el.append(mark, back, title, right);
-  return { el, back, title, settings, close };
+  return { el, back, title, history, settings, close, showName };
 }
 
 export interface Checkbox {

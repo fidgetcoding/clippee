@@ -77,6 +77,18 @@ export function wireNotes(w: NotesWiring): { controls: NoteEntry[]; fixAll(): Fi
               apply: () => void entry.apply(),
               review: () => entry.open(),
               retry: () => entry.retry(),
+              // Through the fix's own receipts, newest first, so the row and
+              // the thread can never disagree about what's in the doc.
+              undo: async () => {
+                const live = (w.existing(index)?.receipts ?? []).filter((c) => !c.undone).reverse();
+                for (const c of live) if (!(await c.undo())) return "Couldn't undo it. The text has changed since.";
+                return undefined;
+              },
+              redo: async () => {
+                const out = (w.existing(index)?.receipts ?? []).filter((c) => c.undone);
+                for (const c of out) if (!(await c.redo())) return "Couldn't put it back. The text has changed since.";
+                return undefined;
+              },
             },
           }
         : {}),

@@ -1,5 +1,6 @@
 import type { PanelAction, PanelState, SnoozeLength } from '../agent/panelTools';
 import type { ChatTurn, DocumentEdit } from '../agent/types';
+import type { HistoryApi } from './docHistory';
 
 /** A local finding, with the passage it is about when there is one. */
 export interface PanelFinding {
@@ -49,8 +50,11 @@ export interface ChatPanelOptions {
   readonly findings: readonly PanelFinding[];
   /** Can he write into this document? Hides Fix buttons when he cannot. */
   readonly canEdit?: boolean;
-  /** Apply accepted proposals. Resolves to what actually happened to each. */
-  readonly onApply?: (edits: readonly DocumentEdit[]) => Promise<AgentChange[]>;
+  /**
+   * Apply accepted proposals. Resolves to what actually happened to each.
+   * `origin` is what the History calls it: the fix's title, "Fix all", or the question.
+   */
+  readonly onApply?: (edits: readonly DocumentEdit[], origin?: string) => Promise<AgentChange[]>;
   /** Redo known receipts without losing their shared undo identity. */
   readonly onRedo?: (changes: readonly AgentChange[]) => Promise<AgentChange[]>;
   /** Select a passage in the page so the user can see it. */
@@ -72,6 +76,10 @@ export interface ChatPanelOptions {
   readonly docTitle?: string;
   /** Fix all has finished and at least one fix landed. He celebrates. */
   readonly onFixAllLanded?: () => void;
+  /** Every change he has made to this doc, kept across reloads. Absent: no History button. */
+  readonly history?: HistoryApi;
+  /** The History undid or redid these changes: bring their receipts in line. */
+  readonly liveChanges?: (ids: readonly string[]) => readonly AgentChange[];
 }
 
 /** Where one thread stands, reported back to its line in the notes list. */
@@ -80,6 +88,8 @@ export type ThreadState =
   | { readonly kind: 'ready'; readonly count: number }
   | { readonly kind: 'answered' }
   | { readonly kind: 'applied' }
+  /** Applied, then taken back out with Undo. */
+  | { readonly kind: 'undone' }
   | { readonly kind: 'skipped' }
   | { readonly kind: 'failed'; readonly reason?: string };
 
@@ -87,9 +97,13 @@ export type ThreadState =
 export interface ChangeControl {
   /** Every change in it is out of the document. */
   readonly undone: boolean;
+  /** What Undo would take out now, or Redo would put back. */
+  readonly changes: readonly AgentChange[];
   /** Resolve to whether anything changed. */
   undo(): Promise<boolean>;
   redo(): Promise<boolean>;
+  /** The History already took these out (or put them back): show it, touch nothing. */
+  settle(undone: boolean): void;
 }
 
 /** The Fix all screen's own controls, for the chat to reach. */
@@ -110,8 +124,10 @@ export interface Thread {
   readonly title: string;
   readonly history: ChatTurn[];
   busy: boolean;
-  /** Set once proposals arrive: applies every one still pending. */
-  applyAll?: () => Promise<AgentChange[]>;
+  /** Set once proposals arrive: applies every one still pending. `origin` overrides the thread's for the History. */
+  applyAll?: (origin?: string) => Promise<AgentChange[]>;
+  /** What the History calls changes made from this thread. */
+  readonly origin?: string;
   /** The first draft request, so Fix all can wait for it. */
   drafting?: Promise<void>;
   /** Fix threads report progress back to their row in the list. */

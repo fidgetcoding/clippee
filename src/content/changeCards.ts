@@ -46,7 +46,7 @@ export function proposalCard(
     );
   };
 
-  const apply = async (picked: typeof rows): Promise<AgentChange[]> => {
+  const apply = async (picked: typeof rows, origin = thread.origin ?? thread.title): Promise<AgentChange[]> => {
     const { onApply } = ctx.options;
     if (!onApply || picked.length === 0) return [];
     for (const r of picked) {
@@ -55,7 +55,7 @@ export function proposalCard(
       for (const b of r.row.querySelectorAll('button')) b.disabled = true;
     }
     try {
-      const changes = await onApply(picked.map((r) => r.edit));
+      const changes = await onApply(picked.map((r) => r.edit), origin);
       if (changes.some((c) => c.applied)) appliedAny = true;
       const missed = changes.find((c) => !c.applied);
       if (missed) failure ??= missed.reason ?? "Couldn't apply it.";
@@ -106,7 +106,7 @@ export function proposalCard(
     well.appendChild(row);
   }
 
-  thread.applyAll = () => apply(rows.filter((r) => !r.done));
+  thread.applyAll = (origin) => apply(rows.filter((r) => !r.done), origin);
   thread.skipAll = () => {
     const waiting = rows.filter((r) => !r.done);
     for (const r of waiting) skips.get(r)?.();
@@ -160,9 +160,27 @@ function undoRedo(
   let busy = false;
   const undoneChanges = new Set<AgentChange>();
   const idle = (): void => draw({ undone, many: current.length > 1 });
+  // A fix can land in more than one receipt: it reads Undone only when all are out.
+  const report = (): void => thread.onStatus?.(
+    (thread.receipts ?? [control]).every((c) => c.undone) ? { kind: 'undone' } : { kind: 'applied' },
+  );
   idle();
-  return {
+  const control: ChangeControl = {
     get undone() { return undone; },
+    get changes() { return current; },
+    settle: (out) => {
+      if (busy || out === undone) return;
+      if (out) {
+        for (const change of current) undoneChanges.add(change);
+        current = batch.filter((change) => undoneChanges.has(change));
+      } else {
+        batch = current;
+        undoneChanges.clear();
+      }
+      undone = out;
+      report();
+      idle();
+    },
     undo: () => {
       const { onUndo } = ctx.options;
       if (!onUndo || undone || busy) return Promise.resolve(false);
@@ -177,7 +195,7 @@ function undoRedo(
           if (undone) {
             // Redo follows the original application order, not reverse undo order.
             current = batch.filter((change) => undoneChanges.has(change));
-            thread.onStatus?.({ kind: 'answered' });
+            report();
           }
           busy = false;
           idle();
@@ -197,7 +215,7 @@ function undoRedo(
       busy = true;
       draw({ undone, busy: 'Redoing…', many: current.length > 1 });
       const pending = onRedo ? onRedo(current)
-        : onApply!(current.map((c) => ({ find: c.find, replace: c.replace })));
+        : onApply!(current.map((c) => ({ find: c.find, replace: c.replace })), thread.origin ?? thread.title);
       return pending
         .then((changes) => {
           busy = false;
@@ -212,7 +230,7 @@ function undoRedo(
           batch = landed;
           undoneChanges.clear();
           undone = false;
-          thread.onStatus?.({ kind: 'applied' });
+          report();
           idle();
           ctx.appendText('assistant', landed.length === attempted ? 'Put the change back in.'
             : `Put back ${landed.length} of ${attempted} changes. The rest could not be applied.`, thread);
@@ -226,6 +244,7 @@ function undoRedo(
         });
     },
   };
+  return control;
 }
 
 /**
@@ -323,6 +342,8 @@ export function receiptScreen(
     thread.results = {
       applied: applied.length,
       get undone() { return control.undone; },
+      get changes() { return control.changes; },
+      settle: control.settle,
       get hiding() { return hide.on; },
       hide: hide.set,
       undo: control.undo,
@@ -333,6 +354,8 @@ export function receiptScreen(
     thread.results = {
       applied: applied.length,
       undone: false,
+      changes: [],
+      settle: () => undefined,
       get hiding() { return hide.on; },
       hide: hide.set,
       undo: () => Promise.resolve(false),
@@ -392,7 +415,7 @@ export function fixAllBar(
     hint.textContent = 'Applying…';
     const changes: AgentChange[] = [];
     // One at a time: each edit is located in the document as it stands now.
-    for (const t of threads) changes.push(...((await t.applyAll?.()) ?? []));
+    for (const t of threads) changes.push(...((await t.applyAll?.('Fix all')) ?? []));
 
     state = 'done';
     if (changes.length === 0) {
