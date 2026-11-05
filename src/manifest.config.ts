@@ -13,7 +13,7 @@ const isFirefox = process.env.TARGET_BROWSER === 'firefox';
 export default defineManifest({
   manifest_version: 3,
   name: 'Clippee by Microshaft',
-  version: '2.2.1',
+  version: '2.2.2',
   description: 'The paperclip is back, and this time he read your doc. Notes and one-click fixes for Google Docs.',
 
   // The Microshaft mark. 16 and 32 are drawn for their size (squares snapped to
