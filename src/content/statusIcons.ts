@@ -17,7 +17,7 @@ const ART: Readonly<Record<StatusIcon, { rows: readonly string[]; pal: Readonly<
       '...kyyyyyyyk....', '....kyyyyyk.....', '....kgwgwgk.....', '....kwgwgwk.....',
       '....kgwgwgk.....', '.....kkkkk......', '......kkk.......', '................',
     ],
-    pal: { k: '#0a0a0a', y: '#ffff00', w: '#ffffff', g: '#808080' },
+    pal: { k: '#0e0a06', y: '#f2ad2a', w: '#ffffff', g: '#857f75' },
   },
   glass: {
     rows: [
@@ -26,7 +26,7 @@ const ART: Readonly<Record<StatusIcon, { rows: readonly string[]; pal: Readonly<
       '....kwwywk......', '...kwwwyywk.....', '..kwwwyyyywk....', '..kwyyyyyywk....',
       '.kggggggggggk...', '.kkkkkkkkkkkk...', '................', '................',
     ],
-    pal: { k: '#0a0a0a', g: '#808080', w: '#ffffff', y: '#c8a000' },
+    pal: { k: '#0e0a06', g: '#857f75', w: '#ffffff', y: '#cc9600' },
   },
   ok: {
     rows: [
@@ -35,7 +35,7 @@ const ART: Readonly<Record<StatusIcon, { rows: readonly string[]; pal: Readonly<
       '...ggg.ggg......', '....ggggg.......', '.....ggg........', '......g.........',
       '................', '................', '................', '................',
     ],
-    pal: { g: '#008000' },
+    pal: { g: '#6f8821' },
   },
   err: {
     rows: [
@@ -44,7 +44,7 @@ const ART: Readonly<Record<StatusIcon, { rows: readonly string[]; pal: Readonly<
       'krrrrwwwwwwrrrrk', '.krrwwwrrwwwrrk.', '.krrwwrrrrwwrrk.', '..krrrrrrrrrrk..',
       '...kkrrrrrrkk...', '.....kkkkkk.....', '................', '................',
     ],
-    pal: { k: '#0a0a0a', r: '#e00000', w: '#ffffff' },
+    pal: { k: '#0e0a06', r: '#e05a2e', w: '#ffffff' },
   },
 };
 

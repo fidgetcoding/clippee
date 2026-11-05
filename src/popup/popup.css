@@ -10,12 +10,12 @@ body {
   padding: 14px 16px 12px;
   font-family: "Segoe UI", Tahoma, "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
-  color: #141400;
-  background: #ffffdc;
+  color: #1a1408;
+  background: #fff9d8;
 }
 
 header {
-  border-bottom: 1px solid #d8c88a;
+  border-bottom: 1px solid #dcc285;
   padding-bottom: 10px;
   margin-bottom: 12px;
 }
@@ -29,7 +29,7 @@ h1 {
 #status {
   margin: 3px 0 0;
   font-size: 12px;
-  color: #6b6449;
+  color: #6f5f45;
 }
 
 .rows {
@@ -55,14 +55,14 @@ h1 {
 
 .row small {
   font-size: 11.5px;
-  color: #6b6449;
+  color: #6f5f45;
 }
 
 input[type="checkbox"] {
   flex: none;
   width: 16px;
   height: 16px;
-  accent-color: #0b6b68;
+  accent-color: #1d6a55;
   cursor: pointer;
 }
 
@@ -73,7 +73,7 @@ input[type="checkbox"] {
   gap: 10px;
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #d8c88a;
+  border-top: 1px solid #dcc285;
 }
 
 .snooze-label {
@@ -89,32 +89,32 @@ button {
   font: inherit;
   font-size: 12.5px;
   padding: 4px 10px;
-  border: 1px solid #7f7f6d;
+  border: 1px solid #857a66;
   border-radius: 4px;
-  background: #f3f3e0;
-  color: #141400;
+  background: #f6f1dc;
+  color: #1a1408;
   cursor: pointer;
 }
 
 button:hover {
-  background: #e8e8d0;
+  background: #ece5cb;
 }
 
 button[aria-pressed="true"] {
-  background: #0b6b68;
-  border-color: #064442;
+  background: #1d6a55;
+  border-color: #11473a;
   color: #ffffff;
 }
 
 button:focus-visible {
-  outline: 2px solid #0b6b68;
+  outline: 2px solid #1d6a55;
   outline-offset: 1px;
 }
 
 footer {
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid #d8c88a;
+  border-top: 1px solid #dcc285;
 }
 
 footer button {
@@ -127,26 +127,26 @@ footer button {
   gap: 5px;
   padding-bottom: 12px;
   margin-bottom: 4px;
-  border-bottom: 1px solid #d8c88a;
+  border-bottom: 1px solid #dcc285;
 }
 
 .apikey label {
   font-size: 12px;
-  color: #6b6449;
+  color: #6f5f45;
 }
 
 .apikey input {
   font: inherit;
   font-size: 13px;
   padding: 6px 8px;
-  border: 1px solid #b8ac7c;
+  border: 1px solid #c0aa78;
   border-radius: 5px;
-  background: #fffef4;
-  color: #141400;
+  background: #fffcf0;
+  color: #1a1408;
 }
 
 .apikey input:focus-visible {
-  outline: 2px solid #0b6b68;
+  outline: 2px solid #1d6a55;
   outline-offset: -1px;
 }
 
@@ -154,17 +154,17 @@ footer button {
   margin: 0;
   font-size: 11.5px;
   line-height: 1.35;
-  color: #6b6449;
+  color: #6f5f45;
 }
 
 .hint[data-state="saved"] {
-  color: #1b6e42;
+  color: #2b6a32;
 }
 
 /* No key yet: this is the only thing that matters, so it reads as step one. */
 .apikey[data-missing] {
-  background: #fff3b0;
-  border: 2px solid #0b6b68;
+  background: #ffecac;
+  border: 2px solid #1d6a55;
   border-radius: 6px;
   padding: 10px;
   margin-bottom: 10px;
@@ -173,18 +173,18 @@ footer button {
 .apikey[data-missing] label[for="apikey"] {
   font-size: 13px;
   font-weight: 700;
-  color: #141400;
+  color: #1a1408;
 }
 
 .getkey {
   font-size: 12px;
-  color: #0b6b68;
+  color: #1d6a55;
   font-weight: 600;
 }
 
 .workspace summary {
   font-size: 11.5px;
-  color: #6b6449;
+  color: #6f5f45;
   cursor: pointer;
 }
 
@@ -196,14 +196,15 @@ footer button {
 
 .workspace label {
   font-size: 12px;
-  color: #6b6449;
+  color: #6f5f45;
 }
 
 .workspace input {
   font: inherit;
   font-size: 13px;
   padding: 6px 8px;
-  border: 1px solid #b8ac7c;
+  border: 1px solid #c0aa78;
   border-radius: 5px;
-  background: #fffef4;
+  background: #fffcf0;
+  color: #1a1408;
 }

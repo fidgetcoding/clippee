@@ -19,7 +19,7 @@
   padding: 5px 8px;
   font-size: 12px;
   background: #fff;
-  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #404040, inset -2px -2px #dfdfdf;
+  box-shadow: inset 1px 1px #857f75, inset -1px -1px #fff, inset 2px 2px #45403a, inset -2px -2px #e4e0d8;
 }
 
 .mrclippy-turn-user::before {
@@ -113,7 +113,7 @@
 
 .mrclippy-change-failed {
   color: var(--mc-mute);
-  background: #f3efd2;
+  background: #f6ecce;
 }
 
 .mrclippy-change-failed .mrclippy-diff del,
@@ -124,7 +124,7 @@
 
 .mrclippy-change-failed .mrclippy-diff ins {
   font-weight: 400;
-  outline-color: #b0ab90;
+  outline-color: #b5a888;
 }
 
 .mrclippy-change-why {
@@ -154,7 +154,7 @@
 }
 
 .mrclippy-diff del {
-  color: #800000;
+  color: #8a1404;
   text-decoration: line-through;
   text-decoration-thickness: 1.5px;
 }

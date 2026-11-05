@@ -140,7 +140,7 @@
   position: relative;
   margin-top: 9px;
   padding: 13px 8px 8px;
-  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #fff, inset -2px -2px #808080;
+  box-shadow: inset 1px 1px #857f75, inset -1px -1px #fff, inset 2px 2px #fff, inset -2px -2px #857f75;
 }
 
 .mrclippy-lg {
@@ -165,7 +165,7 @@
 .mrclippy-well {
   padding: 2px;
   background: #fff;
-  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #404040, inset -2px -2px #dfdfdf;
+  box-shadow: inset 1px 1px #857f75, inset -1px -1px #fff, inset 2px 2px #45403a, inset -2px -2px #e4e0d8;
 }
 
 .mrclippy-lvh {
@@ -179,7 +179,7 @@
   font-size: 11px;
   line-height: 16px;
   background: var(--mc-face);
-  box-shadow: inset -1px -1px #404040, inset 1px 1px #fff, inset -2px -2px #808080;
+  box-shadow: inset -1px -1px #45403a, inset 1px 1px #fff, inset -2px -2px #857f75;
 }
 
 .mrclippy-chk {
@@ -202,7 +202,7 @@
   width: 13px;
   height: 13px;
   background: #fff;
-  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #404040, inset -2px -2px #dfdfdf;
+  box-shadow: inset 1px 1px #857f75, inset -1px -1px #fff, inset 2px 2px #45403a, inset -2px -2px #e4e0d8;
 }
 
 .mrclippy-chk[aria-pressed="true"] i::after {
@@ -212,13 +212,13 @@
   top: 1.5px;
   width: 3px;
   height: 7px;
-  border: solid #000;
+  border: solid #0c0602;
   border-width: 0 2px 2px 0;
   transform: rotate(40deg);
 }
 
 .mrclippy-chk:focus-visible {
-  outline: 1px dotted #000;
+  outline: 1px dotted #0c0602;
 }
 
 /* ---------- note rows ---------- */
@@ -335,8 +335,8 @@
 }
 
 .mrclippy-locatable:hover {
-  background: #fff7c2;
-  outline: 1px dotted #000;
+  background: #fff1bc;
+  outline: 1px dotted #0c0602;
   outline-offset: -1px;
 }
 
@@ -378,11 +378,11 @@
 }
 
 .mrclippy-q:hover {
-  background: #fff7c2;
+  background: #fff1bc;
 }
 
 .mrclippy-q:focus-visible {
-  outline: 1px dotted #000;
+  outline: 1px dotted #0c0602;
   outline-offset: -1px;
 }
 
@@ -456,16 +456,16 @@
   background: #fff;
   border: 0;
   border-radius: 0;
-  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #404040, inset -2px -2px #dfdfdf;
+  box-shadow: inset 1px 1px #857f75, inset -1px -1px #fff, inset 2px 2px #45403a, inset -2px -2px #e4e0d8;
   resize: none;
 }
 
 .mrclippy-input::placeholder {
-  color: #6b6b6b;
+  color: #706a62;
 }
 
 .mrclippy-input:focus-visible {
-  outline: 1px dotted #000;
+  outline: 1px dotted #0c0602;
   outline-offset: -4px;
 }
 

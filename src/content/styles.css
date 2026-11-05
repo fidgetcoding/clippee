@@ -15,16 +15,16 @@
 
 :host {
   all: initial;
-  --mc-bal: #ffffdc;
-  --mc-ink: #141400;
-  --mc-rib: linear-gradient(90deg, #000080, #1084d0);
-  --mc-face: #c0c0c0;
-  --mc-hair: #7f7f6d;
-  --mc-div: #d8c88a;
-  --mc-mute: #6b6449;
-  --mc-teal: #0b6b68;
-  --mc-navy: #000080;
-  --mc-why: #8a1c12;
+  --mc-bal: #fff9d8;
+  --mc-ink: #1a1408;
+  --mc-rib: linear-gradient(90deg, #16107c, #3a80cc);
+  --mc-face: #c6c1b8;
+  --mc-hair: #857a66;
+  --mc-div: #dcc285;
+  --mc-mute: #6f5f45;
+  --mc-teal: #1d6a55;
+  --mc-navy: #16107c;
+  --mc-why: #962a10;
   --mc-font: Tahoma, "MS Sans Serif", "Segoe UI", Geneva, Verdana, sans-serif;
 }
 
@@ -65,10 +65,10 @@
   font-family: var(--mc-font);
   font-size: 11px;
   line-height: 1;
-  color: #000;
+  color: #0c0602;
   background: var(--mc-face);
   border: 0;
-  box-shadow: inset -1px -1px #404040, inset 1px 1px #fff;
+  box-shadow: inset -1px -1px #45403a, inset 1px 1px #fff;
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s ease;
@@ -90,7 +90,7 @@
   padding: 10px 12px;
   box-sizing: border-box;
   background: var(--mc-bal);
-  border: 1px solid #000;
+  border: 1px solid #0c0602;
   border-radius: 9px;
   font-family: var(--mc-font);
   font-size: 13px;
@@ -138,7 +138,7 @@
 
 .mrclippy-tail-line {
   fill: none;
-  stroke: #000;
+  stroke: #0c0602;
   stroke-width: 1;
 }
 
@@ -202,7 +202,7 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--mc-bal);
-  border: 1px solid #000;
+  border: 1px solid #0c0602;
   border-radius: 9px;
 }
 
@@ -295,28 +295,28 @@
   font-weight: 400;
   line-height: 1;
   white-space: nowrap;
-  color: #000;
+  color: #0c0602;
   background: var(--mc-face);
   border: 0;
   border-radius: 0;
-  box-shadow: inset -1px -1px #404040, inset 1px 1px #fff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
+  box-shadow: inset -1px -1px #45403a, inset 1px 1px #fff, inset -2px -2px #857f75, inset 2px 2px #e4e0d8;
   cursor: pointer;
 }
 
 .mrclippy-btn:active:not(:disabled) {
-  box-shadow: inset 1px 1px #404040, inset -1px -1px #fff, inset 2px 2px #808080, inset -2px -2px #dfdfdf;
+  box-shadow: inset 1px 1px #45403a, inset -1px -1px #fff, inset 2px 2px #857f75, inset -2px -2px #e4e0d8;
   padding-top: 2px;
   padding-left: 11px;
   padding-right: 9px;
 }
 
 .mrclippy-btn:focus-visible {
-  outline: 1px dotted #000;
+  outline: 1px dotted #0c0602;
   outline-offset: -4px;
 }
 
 .mrclippy-btn:disabled {
-  color: #808080;
+  color: #857f75;
   text-shadow: 1px 1px #fff;
   cursor: default;
 }
@@ -328,7 +328,7 @@
 /* The default action: black ring. Primary adds the teal label. */
 .mrclippy-btn-default,
 .mrclippy-btn-primary {
-  outline: 1px solid #000;
+  outline: 1px solid #0c0602;
   outline-offset: 0;
 }
 
@@ -339,9 +339,9 @@
 
 .mrclippy-btn-primary:focus-visible,
 .mrclippy-btn-default:focus-visible {
-  outline: 1px solid #000;
-  box-shadow: inset -1px -1px #404040, inset 1px 1px #fff, inset -2px -2px #808080, inset 2px 2px #dfdfdf,
-    inset 0 0 0 4px var(--mc-face), inset 0 0 0 5px #000;
+  outline: 1px solid #0c0602;
+  box-shadow: inset -1px -1px #45403a, inset 1px 1px #fff, inset -2px -2px #857f75, inset 2px 2px #e4e0d8,
+    inset 0 0 0 4px var(--mc-face), inset 0 0 0 5px #0c0602;
 }
 
 .mrclippy-btn-sm {
@@ -362,7 +362,7 @@
 
 .mrclippy-sunk {
   background: #fff;
-  box-shadow: inset 1px 1px #808080, inset -1px -1px #fff, inset 2px 2px #404040, inset -2px -2px #dfdfdf;
+  box-shadow: inset 1px 1px #857f75, inset -1px -1px #fff, inset 2px 2px #45403a, inset -2px -2px #e4e0d8;
 }
 
 /* ---------- bullets, progress ---------- */
@@ -373,13 +373,13 @@
   width: 13px;
   height: 13px;
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 30%, #e3efff 0 13%, #5d93f0 34%, #1849c0 62%, #0b2a7a 100%);
-  box-shadow: 0 0 0 0.5px #062060;
+  background: radial-gradient(circle at 34% 30%, #ece9ff 0 13%, #6c86ea 34%, #2a3ec0 62%, #14217a 100%);
+  box-shadow: 0 0 0 0.5px #10166a;
 }
 
 .mrclippy-bul-done {
-  background: radial-gradient(circle at 34% 30%, #fff 0 12%, #cfcab0 40%, #8f8a70 100%);
-  box-shadow: 0 0 0 0.5px #6b6449;
+  background: radial-gradient(circle at 34% 30%, #fff 0 12%, #d6cbaa 40%, #958a68 100%);
+  box-shadow: 0 0 0 0.5px var(--mc-mute);
 }
 
 .mrclippy-bar {
