@@ -6,6 +6,8 @@
   "description": "The paperclip is back, and this time he read your doc. Notes and one-click fixes for Google Docs.",
   "scripts": {
     "dev": "vite",
+    "fx": "node scripts/build-fx.mjs",
+    "prebuild": "node scripts/build-fx.mjs --check",
     "build": "vite build",
     "build:firefox": "TARGET_BROWSER=firefox vite build",
     "typecheck": "tsc --noEmit",
