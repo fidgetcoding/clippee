@@ -1,3 +1,4 @@
+import type { PanelAction, PanelState, SnoozeLength } from '../agent/panelTools';
 import type { ChatTurn, DocumentEdit } from '../agent/types';
 
 /** A local finding, with the passage it is about when there is one. */
@@ -33,10 +34,13 @@ export interface AgentReply {
   readonly changes?: readonly AgentChange[];
   /** Edits he suggests. Shown as before/after; applied only on the user's say-so. */
   readonly proposals?: readonly DocumentEdit[];
+  /** He answered by working the panel. Run through the same paths as the buttons. */
+  readonly actions?: readonly PanelAction[];
 }
 
 export interface ChatPanelOptions {
-  readonly onAsk: (question: string, history: readonly ChatTurn[]) => Promise<AgentReply>;
+  /** `panel` is sent with typed questions only, so he can answer by working the panel. */
+  readonly onAsk: (question: string, history: readonly ChatTurn[], panel?: PanelState) => Promise<AgentReply>;
   /** Reverse the applied changes from one reply. Resolves to a line for the log. */
   readonly onUndo?: (changes: readonly AgentChange[]) => Promise<string | UndoResult>;
   /** The structure audit. Runs the local-then-cloud ladder, not a chat turn. */
@@ -60,6 +64,10 @@ export interface ChatPanelOptions {
   readonly onClose: () => void;
   /** Open Settings: API key, mute, snooze, per-site switch. */
   readonly onSettings: () => void;
+  /** "Snooze for an hour", asked in the chat. */
+  readonly onSnooze?: (length: SnoozeLength) => Promise<unknown>;
+  /** "Mute" or "unmute", asked in the chat. */
+  readonly onMute?: (muted: boolean) => Promise<unknown>;
   /** The document's name, for "on <title>" under the heading. */
   readonly docTitle?: string;
 }
@@ -72,6 +80,23 @@ export type ThreadState =
   | { readonly kind: 'applied' }
   | { readonly kind: 'skipped' }
   | { readonly kind: 'failed'; readonly reason?: string };
+
+/** Undo and Redo over one set of applied changes: a receipt, or Fix all's whole screen. */
+export interface ChangeControl {
+  /** Every change in it is out of the document. */
+  readonly undone: boolean;
+  /** Resolve to whether anything changed. */
+  undo(): Promise<boolean>;
+  redo(): Promise<boolean>;
+}
+
+/** The Fix all screen's own controls, for the chat to reach. */
+export interface ResultControls extends ChangeControl {
+  readonly applied: number;
+  readonly hiding: boolean;
+  /** What the "Hide applied" checkbox does. */
+  hide(on: boolean): void;
+}
 
 /**
  * One conversation. The panel's main thread holds the list of notes and any
@@ -89,10 +114,18 @@ export interface Thread {
   drafting?: Promise<void>;
   /** Fix threads report progress back to their row in the list. */
   readonly onStatus?: (state: ThreadState) => void;
+  /** The last state reported through `onStatus`. */
+  state?: ThreadState;
   /** Pinned under the thread instead of scrolling with it (Undo all, Redo). */
   foot?: HTMLElement;
-  /** No composer: a thread that is a result, not a conversation. */
+  /** A result, not a conversation: questions asked from it open a chat of their own. */
   readonly quiet?: boolean;
+  /** Every receipt's Undo/Redo, oldest first. */
+  receipts?: ChangeControl[];
+  /** What Skip does on every proposal still waiting. Resolves to how many it skipped. */
+  skipAll?: () => number;
+  /** Set on the Fix all screen. */
+  results?: ResultControls;
 }
 
 /**

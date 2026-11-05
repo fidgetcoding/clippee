@@ -1,3 +1,5 @@
+import type { PanelAction, PanelState } from './panelTools';
+
 /** Messages exchanged between the content script and the background worker. */
 
 export interface AskRequest {
@@ -14,6 +16,8 @@ export interface AskRequest {
   readonly related?: readonly RelatedContext[];
   /** True when the page can take edits, so he is given the edit tool. */
   readonly canEdit?: boolean;
+  /** What the panel shows right now. Only typed questions carry it: he may answer by working the panel. */
+  readonly panel?: PanelState;
 }
 
 /** One change he wants made: swap `find` (quoted from the document) for `replace`. */
@@ -51,7 +55,13 @@ export type AuditResponse =
   | { readonly ok: false; readonly error: string; readonly needsKey?: boolean };
 
 export type AskResponse =
-  | { readonly ok: true; readonly text: string; readonly edits?: readonly DocumentEdit[] }
+  | {
+      readonly ok: true;
+      readonly text: string;
+      readonly edits?: readonly DocumentEdit[];
+      /** Panel controls to work, in order, when he answered by using the panel. */
+      readonly actions?: readonly PanelAction[];
+    }
   | { readonly ok: false; readonly error: string; readonly needsKey?: boolean };
 
 export const MAX_DOCUMENT_CHARS = 60_000;

@@ -62,11 +62,16 @@ export function buildTitleBar(options: ChatPanelOptions): TitleBar {
   return { el, back, title, settings, close };
 }
 
-/** A Win98 checkbox drawn as a toggle button, so it styles the same everywhere. */
-export function checkbox(label: string, onChange: (on: boolean) => void): {
-  el: HTMLButtonElement;
+export interface Checkbox {
+  readonly el: HTMLButtonElement;
+  readonly on: boolean;
+  /** What a click does, for the chat to use: a no-op when it is already that way. */
+  set(on: boolean): void;
   setLabel(text: string): void;
-} {
+}
+
+/** A Win98 checkbox drawn as a toggle button, so it styles the same everywhere. */
+export function checkbox(label: string, onChange: (on: boolean) => void): Checkbox {
   const el = document.createElement('button');
   el.type = 'button';
   el.className = 'mrclippy-chk';
@@ -75,12 +80,19 @@ export function checkbox(label: string, onChange: (on: boolean) => void): {
   const text = document.createElement('span');
   text.textContent = label;
   el.append(box, text);
-  el.addEventListener('click', () => {
-    const on = el.getAttribute('aria-pressed') !== 'true';
+  const isOn = (): boolean => el.getAttribute('aria-pressed') === 'true';
+  const set = (on: boolean): void => {
+    if (on === isOn()) return;
     el.setAttribute('aria-pressed', String(on));
     onChange(on);
-  });
-  return { el, setLabel: (t) => (text.textContent = t) };
+  };
+  el.addEventListener('click', () => set(!isOn()));
+  return {
+    el,
+    get on() { return isOn(); },
+    set,
+    setLabel: (t) => (text.textContent = t),
+  };
 }
 
 /**
@@ -135,9 +147,14 @@ export interface AskArea {
   readonly form: HTMLFormElement;
   readonly input: HTMLTextAreaElement;
   readonly send: HTMLButtonElement;
+  /** His one-line answer to a request made from a list, which has no chat to put it in. */
+  readonly reply: HTMLElement;
 }
 
-/** "Ask Clippee": the ribbon, the chips under it, a sunken box and a big Ask. */
+/**
+ * "Ask Clippee": the ribbon, the chips under it, his last word on a request,
+ * a sunken box and a big Ask. The same box on every screen.
+ */
 export function buildAskArea(chips: HTMLElement): AskArea {
   const el = document.createElement('div');
   el.className = 'mrclippy-ask-area';
@@ -158,7 +175,12 @@ export function buildAskArea(chips: HTMLElement): AskArea {
   send.type = 'submit';
 
   form.append(input, send);
-  inner.append(chips, form);
+  const reply = document.createElement('div');
+  reply.className = 'mrclippy-ask-reply';
+  reply.setAttribute('role', 'status');
+  reply.setAttribute('aria-live', 'polite');
+  reply.hidden = true;
+  inner.append(chips, reply, form);
   el.append(ribbon('Ask Clippee'), inner);
-  return { el, form, input, send };
+  return { el, form, input, send, reply };
 }

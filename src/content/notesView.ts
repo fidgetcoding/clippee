@@ -1,5 +1,5 @@
 import { noteLabel, tallyLine, type PanelFinding, type ThreadState } from './chatTypes';
-import { button, checkbox, groupBox } from './panelChrome';
+import { button, checkbox, groupBox, type Checkbox } from './panelChrome';
 import { bullet, progressBar, statusIcon } from './statusIcons';
 
 /** What a note's buttons do. The panel owns threads; this only draws them. */
@@ -17,9 +17,18 @@ export interface NoteHandlers {
 
 export interface NoteRow {
   readonly el: HTMLElement;
+  /** Where its fix stands. Undefined until a draft starts. */
+  readonly state: ThreadState | undefined;
   setState(state: ThreadState): void;
   /** The Review/Fix button's label, once the thread exists. */
   opened(): void;
+  /** What the Ignore button does. */
+  ignore(): void;
+}
+
+export interface QuestionRow {
+  setState(state: ThreadState): void;
+  remove(): void;
 }
 
 /**
@@ -34,7 +43,7 @@ export class NotesView {
   private readonly tally: HTMLElement;
   private readonly well: HTMLElement | undefined;
   private readonly hiddenLine: HTMLElement | undefined;
-  private readonly hideToggle: ReturnType<typeof checkbox> | undefined;
+  private readonly hideToggle: Checkbox | undefined;
   private readonly groups: HTMLElement;
   private questions: HTMLElement | undefined;
   private readonly states = new Map<HTMLElement, ThreadState | undefined>();
@@ -102,6 +111,17 @@ export class NotesView {
     this.refresh();
   }
 
+  /** What ticking "Hide fixed" does. Undefined when there is no list to hide from. */
+  setHideFixed(on: boolean): number | undefined {
+    if (!this.hideToggle) return undefined;
+    this.hideToggle.set(on);
+    return this.el.querySelectorAll('[data-fixed]').length;
+  }
+
+  get hidingFixed(): boolean {
+    return this.hideToggle?.on ?? false;
+  }
+
   /** In place of Fix all when there is no API key: one line and one button. */
   askForKey(openSettings: () => void): void {
     const line = document.createElement('div');
@@ -161,19 +181,25 @@ export class NotesView {
       ac.append(apply, review, retry, bar);
     }
     ac.appendChild(note);
-    ignore.addEventListener('click', () => {
+    let dropped = false;
+    const drop = (): void => {
+      if (dropped) return;
+      dropped = true;
       handlers.dismiss();
       row.remove();
       this.states.delete(row);
       this.queued.delete(row);
       this.refresh();
-    });
+    };
+    ignore.addEventListener('click', drop);
 
     row.append(ic, tx, st, ac, ignore);
     if (fix?.label === 'Review') this.queued.add(row);
     this.well?.appendChild(row);
 
+    let current: ThreadState | undefined;
     const draw = (state: ThreadState | undefined): void => {
+      current = state;
       const kind = state?.kind ?? 'idle';
       row.dataset.state = kind;
       if (kind === 'applied') row.dataset.fixed = '';
@@ -230,15 +256,17 @@ export class NotesView {
 
     return {
       el: row,
+      get state() { return current; },
       setState: draw,
       opened: () => {
         review.textContent = 'Review';
       },
+      ignore: drop,
     };
   }
 
   /** A question asked from the list, so its chat can be reopened like a fix. */
-  addQuestion(title: string, open: () => void): { setState(state: ThreadState): void } {
+  addQuestion(title: string, open: () => void): QuestionRow {
     if (!this.questions) {
       const { box, well } = groupBox('Your questions');
       box.classList.add('mrclippy-chats');
@@ -262,6 +290,14 @@ export class NotesView {
     this.questions.appendChild(row);
 
     return {
+      remove: () => {
+        row.remove();
+        if (this.questions?.childElementCount === 0) {
+          this.questions.closest('.mrclippy-chats')?.remove();
+          this.questions = undefined;
+        }
+        this.refresh();
+      },
       setState: (state) => {
         const done = state.kind !== 'working' && state.kind !== 'failed';
         bul.className = `mrclippy-bul${done ? ' mrclippy-bul-done' : ''}`;

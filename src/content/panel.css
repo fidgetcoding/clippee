@@ -424,6 +424,22 @@
   margin: 0 0 8px;
 }
 
+/* His answer to a request made from a list: one line above the box. */
+.mrclippy-ask-reply {
+  margin: 0 0 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--mc-ink);
+}
+
+.mrclippy-ask-reply[hidden] {
+  display: none;
+}
+
+.mrclippy-ask-reply.mrclippy-pending {
+  color: var(--mc-mute);
+}
+
 .mrclippy-composer {
   display: flex;
   gap: 6px;

@@ -1,5 +1,5 @@
 import type { DocumentEdit } from '../agent/types';
-import type { AgentChange, ChatPanelOptions, Thread } from './chatTypes';
+import type { AgentChange, ChangeControl, ChatPanelOptions, Thread } from './chatTypes';
 import { renderDiff } from './diffView';
 import { button, checkbox, groupBox } from './panelChrome';
 import { bullet, statusIcon } from './statusIcons';
@@ -76,6 +76,7 @@ export function proposalCard(
     }
   };
 
+  const skips = new Map<(typeof rows)[number], () => void>();
   for (const edit of edits) {
     const row = document.createElement('div');
     row.className = 'mrclippy-change mrclippy-proposal';
@@ -92,12 +93,13 @@ export function proposalCard(
     take.addEventListener('click', () => void apply([entry]));
 
     const skip = button('Skip', 'mrclippy-btn-sm');
-    skip.addEventListener('click', () => {
+    skips.set(entry, () => {
       entry.done = true;
       row.classList.add('mrclippy-proposal-skipped');
       buttons.remove();
       settle();
     });
+    skip.addEventListener('click', () => skips.get(entry)?.());
 
     buttons.append(take, skip);
     row.appendChild(buttons);
@@ -105,6 +107,11 @@ export function proposalCard(
   }
 
   thread.applyAll = () => apply(rows.filter((r) => !r.done));
+  thread.skipAll = () => {
+    const waiting = rows.filter((r) => !r.done);
+    for (const r of waiting) skips.get(r)?.();
+    return waiting.length;
+  };
 
   if (n > 1) {
     const foot = document.createElement('div');
@@ -138,14 +145,15 @@ function changeRow(ctx: CardContext, change: AgentChange): HTMLElement {
 
 /**
  * Undo and Redo over one set of applied changes, as many times as the user
- * likes. `draw` repaints whichever buttons the caller shows.
+ * likes. `draw` repaints whichever buttons the caller shows. The buttons and
+ * the chat both go through the control this returns.
  */
 function undoRedo(
   ctx: CardContext,
   applied: readonly AgentChange[],
   thread: Thread,
   draw: (state: { undone: boolean; busy?: 'Undoing…' | 'Redoing…'; many: boolean }) => void,
-): { undo(): void; redo(): void } {
+): ChangeControl {
   let current = applied;
   let undone = false;
   let batch = applied;
@@ -154,12 +162,13 @@ function undoRedo(
   const idle = (): void => draw({ undone, many: current.length > 1 });
   idle();
   return {
+    get undone() { return undone; },
     undo: () => {
       const { onUndo } = ctx.options;
-      if (!onUndo || undone || busy) return;
+      if (!onUndo || undone || busy) return Promise.resolve(false);
       busy = true;
       draw({ undone, busy: 'Undoing…', many: current.length > 1 });
-      void onUndo(current)
+      return onUndo(current)
         .then((result) => {
           const completed = typeof result === 'string' ? current : result.undone;
           for (const change of completed) undoneChanges.add(change);
@@ -173,21 +182,23 @@ function undoRedo(
           busy = false;
           idle();
           ctx.appendText('assistant', typeof result === 'string' ? result : result.message, thread);
+          return completed.length > 0;
         })
         .catch((error: unknown) => {
           busy = false;
           idle();
           ctx.appendText('error', error instanceof Error ? error.message : 'Undo failed.', thread);
+          return false;
         });
     },
     redo: () => {
       const { onApply, onRedo } = ctx.options;
-      if ((!onApply && !onRedo) || !undone || busy) return;
+      if ((!onApply && !onRedo) || !undone || busy) return Promise.resolve(false);
       busy = true;
       draw({ undone, busy: 'Redoing…', many: current.length > 1 });
       const pending = onRedo ? onRedo(current)
         : onApply!(current.map((c) => ({ find: c.find, replace: c.replace })));
-      void pending
+      return pending
         .then((changes) => {
           busy = false;
           const attempted = current.length;
@@ -195,7 +206,7 @@ function undoRedo(
           if (landed.length === 0) {
             idle();
             ctx.appendText('error', "Couldn't put it back. The text has changed since.", thread);
-            return;
+            return false;
           }
           current = landed;
           batch = landed;
@@ -205,11 +216,13 @@ function undoRedo(
           idle();
           ctx.appendText('assistant', landed.length === attempted ? 'Put the change back in.'
             : `Put back ${landed.length} of ${attempted} changes. The rest could not be applied.`, thread);
+          return true;
         })
         .catch((error: unknown) => {
           busy = false;
           idle();
           ctx.appendText('error', error instanceof Error ? error.message : 'Redo failed.', thread);
+          return false;
         });
     },
   };
@@ -241,10 +254,8 @@ export function receipt(
       toggle.textContent = busy ?? (undone ? 'Redo' : 'Undo') + (many ? ' all' : '');
       box.classList.toggle('mrclippy-receipt-undone', undone);
     });
-    toggle.addEventListener('click', () => {
-      if (box.classList.contains('mrclippy-receipt-undone')) control.redo();
-      else control.undo();
-    });
+    toggle.addEventListener('click', () => void (control.undone ? control.redo() : control.undo()));
+    (thread.receipts ??= []).push(control);
     box.appendChild(toggle);
   }
   return box;
@@ -305,12 +316,37 @@ export function receiptScreen(
       redo.textContent = busy === 'Redoing…' ? busy : 'Redo';
       box.classList.toggle('mrclippy-receipt-undone', undone);
     });
-    undo.addEventListener('click', () => control.undo());
-    redo.addEventListener('click', () => control.redo());
+    undo.addEventListener('click', () => void control.undo());
+    redo.addEventListener('click', () => void control.redo());
     foot.append(undo, redo);
     thread.foot = foot;
+    thread.results = {
+      applied: applied.length,
+      get undone() { return control.undone; },
+      get hiding() { return hide.on; },
+      hide: hide.set,
+      undo: control.undo,
+      redo: control.redo,
+    };
+  } else {
+    // No Undo all on this screen, but its checkbox is still the chat's to tick.
+    thread.results = {
+      applied: applied.length,
+      undone: false,
+      get hiding() { return hide.on; },
+      hide: hide.set,
+      undo: () => Promise.resolve(false),
+      redo: () => Promise.resolve(false),
+    };
   }
   return box;
+}
+
+export interface FixAllBar {
+  readonly el: HTMLElement;
+  readonly state: 'ready' | 'running' | 'done';
+  /** What the button does. Resolves to every change it made, or [] when it had already run. */
+  run(): Promise<AgentChange[]>;
 }
 
 /**
@@ -321,7 +357,7 @@ export function receiptScreen(
 export function fixAllBar(
   fixable: readonly (() => { thread: Thread })[],
   onDone: (changes: AgentChange[]) => void,
-): HTMLElement {
+): FixAllBar {
   const bar = document.createElement('div');
   bar.className = 'mrclippy-fixall';
 
@@ -331,43 +367,47 @@ export function fixAllBar(
   hint.className = 'mrclippy-fixall-hint';
   hint.textContent = `Applies all ${fixable.length} fixes below to your document. One Undo takes them all back.`;
 
-  run.addEventListener('click', () => {
-    void (async () => {
-      run.disabled = true;
-      const threads = fixable.map((ensure) => ensure().thread);
-      let ready = 0;
-      const progress = (): void => {
-        hint.textContent = `Writing fixes: ${ready} of ${threads.length} done.`;
-      };
-      progress();
-      await Promise.all(
-        threads.map((t) =>
-          (t.drafting ?? Promise.resolve()).then(() => {
-            ready += 1;
-            progress();
-          }),
-        ),
-      );
+  let state: FixAllBar['state'] = 'ready';
+  const go = async (): Promise<AgentChange[]> => {
+    if (state !== 'ready') return [];
+    state = 'running';
+    run.disabled = true;
+    const threads = fixable.map((ensure) => ensure().thread);
+    let ready = 0;
+    const progress = (): void => {
+      hint.textContent = `Writing fixes: ${ready} of ${threads.length} done.`;
+    };
+    progress();
+    await Promise.all(
+      threads.map((t) =>
+        (t.drafting ?? Promise.resolve()).then(() => {
+          ready += 1;
+          progress();
+        }),
+      ),
+    );
 
-      hint.textContent = 'Applying…';
-      const changes: AgentChange[] = [];
-      // One at a time: each edit is located in the document as it stands now.
-      for (const t of threads) changes.push(...((await t.applyAll?.()) ?? []));
+    hint.textContent = 'Applying…';
+    const changes: AgentChange[] = [];
+    // One at a time: each edit is located in the document as it stands now.
+    for (const t of threads) changes.push(...((await t.applyAll?.()) ?? []));
 
-      if (changes.length === 0) {
-        run.remove();
-        hint.textContent = 'Nothing left to apply.';
-        return;
-      }
-      const landed = changes.filter((c) => c.applied).length;
-      const again = button('Show changes', 'mrclippy-btn-big');
-      again.addEventListener('click', () => onDone(changes));
-      run.replaceWith(again);
-      hint.textContent = `Applied ${landed} of ${changes.length}. Undo all is on that screen.`;
-      onDone(changes);
-    })();
-  });
+    state = 'done';
+    if (changes.length === 0) {
+      run.remove();
+      hint.textContent = 'Nothing left to apply.';
+      return changes;
+    }
+    const landed = changes.filter((c) => c.applied).length;
+    const again = button('Show changes', 'mrclippy-btn-big');
+    again.addEventListener('click', () => onDone(changes));
+    run.replaceWith(again);
+    hint.textContent = `Applied ${landed} of ${changes.length}. Undo all is on that screen.`;
+    onDone(changes);
+    return changes;
+  };
+  run.addEventListener('click', () => void go());
 
   bar.append(run, hint);
-  return bar;
+  return { el: bar, get state() { return state; }, run: go };
 }

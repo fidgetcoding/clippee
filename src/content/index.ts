@@ -7,6 +7,7 @@ import { Renderer } from '../scheduler/Renderer';
 import { SuggestionQueue } from '../scheduler/SuggestionQueue';
 import type { Breakpoint } from '../scheduler/types';
 import {
+  SNOOZE_DURATIONS_MS,
   isSilenced,
   savePreferences,
   toggleMuted,
@@ -19,10 +20,18 @@ import { Highlighter } from './highlight';
 import { loadLayout, makePanelMovable, saveLayout } from './layout';
 import { ChatPanel, docTitleFrom, type AgentChange, type AgentReply } from './chatPanel';
 import type { AskResponse, AuditResponse, ChatTurn, DocumentEdit } from '../agent/types';
+import type { PanelState, SnoozeLength } from '../agent/panelTools';
 import { EditHistory } from './editHistory';
 import { startPageLifecycle, type PageRuntime } from './pageLifecycle';
 
 const DISMISSAL_KEY = 'mrclippy:dismissals';
+
+/** Snooze lengths the chat can ask for, as the popup's buttons time them. */
+const SNOOZE_MS: Readonly<Record<SnoozeLength, number>> = {
+  '15m': SNOOZE_DURATIONS_MS['15 minutes'],
+  '1h': SNOOZE_DURATIONS_MS['1 hour'],
+  today: SNOOZE_DURATIONS_MS['Rest of today'],
+};
 
 /** Clicking the X sends him away for the rest of the working day. */
 const HIDE_DURATION_MS = 8 * 60 * 60_000;
@@ -179,15 +188,20 @@ async function mountRuntime(
    */
   const drafts = new DraftCache<AgentReply>();
 
-  async function askAgent(question: string, history: readonly ChatTurn[]): Promise<AgentReply> {
+  async function askAgent(
+    question: string,
+    history: readonly ChatTurn[],
+    panel?: PanelState,
+  ): Promise<AgentReply> {
     const generation = panelGeneration;
     const context = source.context?.();
     const document_ = (await source.read()) ?? '';
     if (context !== source.context?.()) throw new Error('The active editor changed. Reopen the panel.');
     if (disposed || generation !== panelGeneration) throw new Error('Panel closed.');
     const canEdit = source.canEdit();
-    const build = () => askAgentUncached(question, history, document_, canEdit);
-    return history.length > 0 ? build() : drafts.get(document_, canEdit, question, build);
+    const build = () => askAgentUncached(question, history, document_, canEdit, panel);
+    // A typed request depends on what the panel shows, so it is never a cached draft.
+    return history.length > 0 || panel ? build() : drafts.get(document_, canEdit, question, build);
   }
 
   /** Send a question to the background worker, which owns the API key. */
@@ -196,6 +210,7 @@ async function mountRuntime(
     history: readonly ChatTurn[],
     document_: string,
     canEdit: boolean,
+    panel?: PanelState,
   ): Promise<AgentReply> {
     if (disposed) throw new Error('Panel closed.');
     const findings = review(document_).map((f) => f.text);
@@ -207,6 +222,7 @@ async function mountRuntime(
       history,
       findings,
       canEdit,
+      ...(panel ? { panel } : {}),
     })) as AskResponse | undefined;
 
     if (!response) throw new Error('No reply from the background worker. Try reloading the tab.');
@@ -214,10 +230,13 @@ async function mountRuntime(
       if (response.needsKey) openSettings(false);
       throw new Error(response.error);
     }
-    if (!response.edits || response.edits.length === 0) return { text: response.text };
-
     // Proposals only. Nothing touches the document until the user applies one.
-    return { text: response.text, proposals: response.edits };
+    // Actions run through the panel's own buttons, which have Undo.
+    return {
+      text: response.text,
+      ...(response.edits && response.edits.length > 0 ? { proposals: response.edits } : {}),
+      ...(response.actions && response.actions.length > 0 ? { actions: response.actions } : {}),
+    };
   }
 
   /** The user accepted one or more proposals. */
@@ -318,8 +337,8 @@ async function mountRuntime(
         // Without a key every draft would fail; say so once instead.
         prefetch: source.canEdit() && hasKey,
         needsKey: !hasKey,
-        onAsk: (question, history) => context === source.context?.()
-          ? askAgent(question, history)
+        onAsk: (question, history, panelState) => context === source.context?.()
+          ? askAgent(question, history, panelState)
           : Promise.reject(new Error('The active editor changed. Reopen the panel.')),
         onApply: (edits) => applyProposals(edits, context),
         onLocate: locatePassage,
@@ -342,9 +361,12 @@ async function mountRuntime(
           queue.dismiss(finding.kind);
           void ext.storage.local.set({ [DISMISSAL_KEY]: queue.dismissalState() });
         },
-        // The title-bar X and Escape. Snooze lives in Settings, not on the panel.
+        // The title-bar X and Escape. Snooze lives in Settings, or in the chat.
         onClose: closePanel,
         onSettings: openSettings,
+        onSnooze: (length) => savePreferences({ snoozeUntil: Date.now() + SNOOZE_MS[length] }),
+        // Unmute means suggestions again now, so it ends a snooze as well.
+        onMute: (muted) => savePreferences(muted ? { muted } : { muted, snoozeUntil: 0 }),
       });
 
       panelNeedsKey = !hasKey;

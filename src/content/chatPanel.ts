@@ -1,7 +1,11 @@
+import type { PanelAction, PanelState } from '../agent/panelTools';
 import { MAX_HISTORY_TURNS, type ChatTurn } from '../agent/types';
-import { fixAllBar, proposalCard, receipt, receiptScreen, type CardContext } from './changeCards';
+import { proposalCard, receipt, receiptScreen, type CardContext, type FixAllBar } from './changeCards';
 import { buildAskArea, buildChips, buildTitleBar, type AskArea, type TitleBar } from './panelChrome';
-import { NotesView } from './notesView';
+import { matchCommand } from './localCommands';
+import { wireNotes, type NoteEntry } from './noteControls';
+import { NotesView, type QuestionRow } from './notesView';
+import { describePanel, runActions, type PanelHost, type QuestionEntry } from './panelActions';
 import {
   describeForHistory,
   fixQuestion,
@@ -10,6 +14,7 @@ import {
   type ChatPanelOptions,
   type PanelFinding,
   type Thread,
+  type ThreadState,
 } from './chatTypes';
 
 export {
@@ -29,13 +34,20 @@ export {
 const MAIN_PLACEHOLDER = 'Ask a question, or tell me what to change…';
 const FIX_PLACEHOLDER = 'Ask about this fix, or tell me to change it…';
 
+interface AskedEntry extends QuestionEntry {
+  state: ThreadState | undefined;
+  removed: boolean;
+  readonly row: QuestionRow;
+}
+
 /**
  * The panel: one speech-balloon sheet beside him.
  *
  * The notes screen is home. Every fix and every question gets a thread of its
  * own, reached from its line in the list and left with "< Notes", so the list
- * stays a list. Nothing here is modal: the title-bar X, clicking him, or
- * Escape puts it away.
+ * stays a list. The Ask box sits at the foot of every screen, and anything a
+ * button does can be asked for there. Nothing here is modal: the title-bar X,
+ * clicking him, or Escape puts it away.
  */
 export class ChatPanel {
   readonly el: HTMLElement;
@@ -46,12 +58,15 @@ export class ChatPanel {
   private active: Thread;
   private readonly fixes = new Map<number, Thread>();
   private fixAllThread: Thread | undefined;
+  private readonly controls: NoteEntry[];
+  private readonly fixAll: () => FixAllBar | undefined;
+  private readonly asked: AskedEntry[] = [];
   private readonly title: TitleBar;
   private readonly viewport: HTMLElement;
   private readonly footSlot: HTMLElement;
   private readonly ask: AskArea;
-  private readonly chips: HTMLElement;
   private readonly notes: NotesView;
+  private readonly host: PanelHost;
 
   private readonly cards: CardContext;
   private disposed = false;
@@ -82,17 +97,18 @@ export class ChatPanel {
     this.footSlot.hidden = true;
     body.appendChild(this.footSlot);
 
-    this.chips = buildChips(
+    // The chips are openers: from any screen, each starts a chat of its own.
+    const chips = buildChips(
       () => void this.runAudit(),
-      (question, label) => void this.submit(question, label),
+      (question, label) => void this.submit(question, label, this.main),
     );
-    this.ask = buildAskArea(this.chips);
+    this.ask = buildAskArea(chips);
     this.ask.form.addEventListener('submit', (event) => {
       event.preventDefault();
       const question = this.ask.input.value.trim();
       if (question.length === 0) return;
       this.ask.input.value = '';
-      void this.submit(question);
+      this.send(question);
     });
     this.ask.input.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' && !event.shiftKey) {
@@ -116,7 +132,32 @@ export class ChatPanel {
     this.active = this.main;
     this.viewport.appendChild(this.main.log);
 
-    this.opening();
+    this.host = {
+      options,
+      notes: this.notes,
+      main: this.main,
+      active: () => this.active,
+      allNotes: () => this.controls,
+      noteOf: (thread) => this.controls.find((c) => this.fixes.get(c.index) === thread),
+      questions: () => this.asked,
+      fixAll: () => this.fixAll(),
+      results: () => this.fixAllThread,
+      threads: () => [...this.fixes.values(), ...this.asked.filter((q) => !q.removed).map((q) => q.thread)],
+      show: (thread) => this.show(thread),
+      audit: () => void this.runAudit(),
+    };
+
+    ({ controls: this.controls, fixAll: this.fixAll } = wireNotes({
+      options,
+      notes: this.notes,
+      fixThread: (index, finding, onStatus) => this.fixThread(index, finding, onStatus),
+      existing: (index) => this.fixes.get(index),
+      forget: (index) => this.fixes.delete(index),
+      show: (thread) => this.show(thread),
+      pointsAt: (el, passage) => this.pointsAt(el, passage),
+      showFixAll: (changes) => this.showFixAll(changes),
+      isDisposed: () => this.disposed,
+    }));
   }
 
   dispose(): void {
@@ -132,27 +173,41 @@ export class ChatPanel {
 
   private newThread(
     title: string,
-    onStatus?: Thread['onStatus'],
+    onStatus?: (state: ThreadState) => void,
     quiet = false,
   ): Thread {
     const log = document.createElement('div');
     log.className = 'mrclippy-log';
-    return {
+    const thread: Thread = {
       log,
       title,
       history: [],
       busy: false,
-      ...(onStatus ? { onStatus } : {}),
+      ...(onStatus ? { onStatus: (state: ThreadState) => { thread.state = state; onStatus(state); } } : {}),
       ...(quiet ? { quiet } : {}),
     };
+    return thread;
   }
 
   /** A new chat, listed under "Your questions" so it can be reopened like a fix. */
   private startChat(title: string): Thread {
-    let thread: Thread | undefined;
-    const row = this.notes.addQuestion(title, () => thread && this.show(thread));
-    thread = this.newThread(title, (state) => row.setState(state));
+    let entry: AskedEntry | undefined;
+    const row = this.notes.addQuestion(title, () => entry && this.show(entry.thread));
+    const thread = this.newThread(title, (state) => {
+      if (entry) entry.state = state;
+      row.setState(state);
+    });
+    entry = { thread, title, row, state: undefined, removed: false };
+    this.asked.push(entry);
     return thread;
+  }
+
+  /** A chat that turned out to be a request to work the panel was never a question. */
+  private dropChat(thread: Thread): void {
+    const entry = this.asked.find((q) => q.thread === thread);
+    if (!entry) return;
+    entry.removed = true;
+    entry.row.remove();
   }
 
   /** Swap the visible thread. Each keeps its own scroll position and history. */
@@ -165,9 +220,7 @@ export class ChatPanel {
     this.title.settings.hidden = inThread;
     this.title.title.textContent = thread.title;
     this.title.title.title = inThread ? thread.title : '';
-    this.chips.hidden = inThread;
-    this.ask.el.hidden = thread.quiet === true;
-    // A fix thread talks about its fix; a question's chat is the general box.
+    // A fix thread talks about its fix; everywhere else the box is the general one.
     const isFix = [...this.fixes.values()].includes(thread);
     this.ask.input.placeholder = isFix ? FIX_PLACEHOLDER : MAIN_PLACEHOLDER;
     this.footSlot.replaceChildren(...(thread.foot ? [thread.foot] : []));
@@ -181,6 +234,56 @@ export class ChatPanel {
     this.ask.send.textContent = this.active.busy ? '…' : 'Ask';
   }
 
+  /** His line above the box, for a request made from a list. Empty hides it. */
+  private say(text: string, pending = false): void {
+    this.ask.reply.textContent = text;
+    this.ask.reply.hidden = text === '';
+    this.ask.reply.classList.toggle('mrclippy-pending', pending);
+  }
+
+  /**
+   * What the box does on every screen. A plain command ("hide applied") runs
+   * at once; anything else goes to him with the panel in view, so he can
+   * answer by working it.
+   */
+  private send(text: string): void {
+    this.say('');
+    const here = this.active;
+    const command = matchCommand(text);
+    if (command) void this.act(text, [command], here);
+    else void this.submit(text, undefined, here, describePanel(this.host, here));
+  }
+
+  /**
+   * Work the panel for something typed into the box, through the same paths
+   * as the buttons. Asked in a chat, his answer goes in the chat. Asked on a
+   * list, which is no place for chat, or if the request moved the panel off
+   * the chat, it goes on the line above the box.
+   */
+  private async act(
+    typed: string,
+    actions: readonly PanelAction[],
+    origin: Thread,
+    pending?: HTMLElement,
+  ): Promise<void> {
+    const inChat = pending !== undefined || (origin !== this.main && !origin.quiet && !origin.busy);
+    if (inChat && !pending) {
+      this.appendText('user', typed, origin);
+      pending = this.appendText('assistant', 'on it…', origin);
+      pending.classList.add('mrclippy-pending');
+    }
+    if (!inChat) this.say('On it…', true);
+    const said = (await runActions(this.host, actions, origin)).join(' ') || 'Done.';
+    if (this.disposed) return;
+    if (pending) {
+      pending.classList.remove('mrclippy-pending');
+      pending.textContent = said;
+      origin.history.push({ role: 'user', text: typed }, { role: 'assistant', text: said });
+      origin.history.splice(0, Math.max(0, origin.history.length - MAX_HISTORY_TURNS));
+    }
+    this.say(inChat && this.active === origin ? '' : said);
+  }
+
   /**
    * Open the thread for one finding, starting the fix the first time. Later
    * clicks just go back to it — the proposals are still there.
@@ -188,7 +291,7 @@ export class ChatPanel {
   private fixThread(
     index: number,
     finding: PanelFinding,
-    onStatus: NonNullable<Thread['onStatus']>,
+    onStatus: (state: ThreadState) => void,
   ): { thread: Thread; started: Promise<void> | undefined } {
     const existing = this.fixes.get(index);
     if (existing) return { thread: existing, started: undefined };
@@ -197,73 +300,6 @@ export class ChatPanel {
     this.fixes.set(index, thread);
     thread.drafting = this.submit(fixQuestion(finding), `Fix: ${title}`, thread);
     return { thread, started: thread.drafting };
-  }
-
-  /**
-   * Draft every fix in the background, a few at a time, so by the time the user
-   * reads the list each row can be applied in one click.
-   */
-  private prefetchFixes(starters: (() => Promise<void> | undefined)[]): void {
-    const queue = [...starters];
-    const worker = async (): Promise<void> => {
-      for (let next = queue.shift(); next && !this.disposed; next = queue.shift()) await next();
-    };
-    // The first draft runs alone so it writes the document to the prompt cache;
-    // the rest then read it from there instead of paying for it again.
-    const first = queue.shift();
-    void Promise.resolve(first?.()).finally(() => {
-      for (let i = 0; i < Math.min(3, queue.length); i++) void worker();
-    });
-  }
-
-  /** The notes screen: every local finding, each with its own fix. */
-  private opening(): void {
-    const { findings } = this.options;
-    const prefetch: (() => Promise<void> | undefined)[] = [];
-    const fixable = new Map<number, () => { thread: Thread }>();
-    const dismissed = new Set<number>();
-    const refreshFixAll = (): void => this.notes.setFixAll(fixable.size > 1
-      ? fixAllBar([...fixable.values()], (changes) => this.showFixAll(changes)) : undefined);
-
-    findings.forEach((finding, index) => {
-      const canFix = finding.anchor !== undefined && this.options.canEdit !== false && !this.options.needsKey;
-      let ensure: (() => { thread: Thread; started: Promise<void> | undefined }) | undefined;
-      const row = this.notes.addNote(finding, {
-        dismiss: () => {
-          dismissed.add(index);
-          fixable.delete(index);
-          refreshFixAll();
-          this.options.onDismissFinding(index);
-        },
-        ...(canFix
-          ? {
-              fix: {
-                label: this.options.prefetch ? 'Review' : 'Fix',
-                // One click: applies the drafted fix straight from the list.
-                apply: () => void ensure?.().thread.applyAll?.(),
-                review: () => {
-                  if (ensure) this.show(ensure().thread);
-                  row.opened();
-                },
-                retry: () => {
-                  this.fixes.delete(index);
-                  ensure?.();
-                },
-              },
-            }
-          : {}),
-      });
-      if (finding.anchor) this.pointsAt(row.el, finding.anchor);
-      if (!canFix) return;
-      ensure = () => this.fixThread(index, finding, (state) => row.setState(state));
-      const start = ensure;
-      if (this.options.prefetch) prefetch.push(() => dismissed.has(index) ? undefined : start().started);
-      fixable.set(index, start);
-    });
-
-    refreshFixAll();
-    if (this.options.needsKey && findings.length > 0) this.notes.askForKey(this.options.onSettings);
-    if (prefetch.length > 0) this.prefetchFixes(prefetch);
   }
 
   /** Fix all's result gets a screen of its own, reached again from the bar. */
@@ -359,14 +395,18 @@ export class ChatPanel {
 
   /**
    * One turn. `shownAs` lets a quick-action chip show its short label in the
-   * transcript while the model receives the full instruction.
+   * transcript while the model receives the full instruction. `panel` rides
+   * along with typed questions, and a reply that works the panel is run
+   * instead of shown.
    */
   private async submit(
     question: string,
     shownAs?: string,
     thread: Thread = this.active,
+    panel?: PanelState,
   ): Promise<void> {
     if (this.disposed) return;
+    const origin = thread;
     // The list stays a list: a question asked from it gets a thread of its own.
     if (thread === this.main || thread.quiet) {
       thread = this.startChat(shownAs ?? question);
@@ -376,6 +416,7 @@ export class ChatPanel {
 
     thread.busy = true;
     this.syncComposer();
+    const before = thread.state;
     thread.onStatus?.({ kind: 'working' });
 
     this.appendText('user', shownAs ?? question, thread);
@@ -383,8 +424,21 @@ export class ChatPanel {
     pending.classList.add('mrclippy-pending');
 
     try {
-      const reply = await this.options.onAsk(question, [...thread.history]);
+      const reply = await this.options.onAsk(question, [...thread.history], panel);
       if (this.disposed) return;
+      if (reply.actions && reply.actions.length > 0 && !reply.proposals?.length) {
+        if (thread === origin) {
+          await this.act(question, reply.actions, origin, pending);
+          // A request is not a turn of the fix: its row goes back to what it said.
+          if (thread.state?.kind === 'working') thread.onStatus?.(before ?? { kind: 'answered' });
+        } else {
+          // Asked from a list, it was never a question: back to where it was asked.
+          this.dropChat(thread);
+          if (this.active === thread) this.show(origin);
+          await this.act(question, reply.actions, origin);
+        }
+        return;
+      }
       pending.classList.remove('mrclippy-pending');
       pending.textContent = reply.text;
       if (reply.proposals && reply.proposals.length > 0) {

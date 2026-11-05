@@ -6,6 +6,7 @@ import Anthropic, {
   RateLimitError,
 } from '@anthropic-ai/sdk';
 import { EDITING_PROMPT, EDIT_TOOL, SYSTEM_PROMPT, buildDocumentBlock } from './prompt';
+import { PANEL_PROMPT, PANEL_TOOL, buildPanelBlock, parsePanelCall, type PanelAction } from './panelTools';
 import {
   MAX_EDITS,
   MAX_HISTORY_TURNS,
@@ -79,7 +80,17 @@ export async function ask(
     ...request.history.slice(-MAX_HISTORY_TURNS).map(
       (turn): Anthropic.MessageParam => ({ role: turn.role, content: turn.text }),
     ),
-    { role: 'user', content: request.question },
+    {
+      role: 'user',
+      // The panel snapshot changes every turn, so it rides here, after the
+      // cached document, never in the system prompt.
+      content: request.panel
+        ? [
+            { type: 'text', text: buildPanelBlock(request.panel) },
+            { type: 'text', text: request.question },
+          ]
+        : request.question,
+    },
   ];
 
   try {
@@ -89,13 +100,16 @@ export async function ask(
       { type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } },
     ];
     if (request.canEdit) system.push({ type: 'text', text: EDITING_PROMPT });
+    // Sent with every ask, drafts included: tools and system render ahead of
+    // the document, and any change there would miss the cache for it.
+    system.push({ type: 'text', text: PANEL_PROMPT });
 
     const stream = client.messages.stream({
       model: MODEL,
       max_tokens: MAX_TOKENS,
       system,
       messages,
-      ...(request.canEdit ? { tools: [EDIT_TOOL] } : {}),
+      tools: request.canEdit ? [EDIT_TOOL, PANEL_TOOL] : [PANEL_TOOL],
     });
 
     const message = await stream.finalMessage();
@@ -110,16 +124,27 @@ export async function ask(
       .join('')
       .trim();
 
-    const call = message.content.find(
-      (block): block is Anthropic.ToolUseBlock =>
-        block.type === 'tool_use' && block.name === EDIT_TOOL.name,
+    const calls = message.content.filter(
+      (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
     );
+    // Panel actions count only when the panel asked: a draft has no panel to work.
+    const actions: PanelAction[] = request.panel
+      ? calls.filter((c) => c.name === PANEL_TOOL.name).flatMap((c) => parsePanelCall(c.input))
+      : [];
+    const call = calls.find((c) => c.name === EDIT_TOOL.name);
     if (call) {
       const parsed = parseEditCall(call.input);
       if (parsed.edits.length > 0) {
-        return { ok: true, text: parsed.summary || text || 'Done.', edits: parsed.edits };
+        return {
+          ok: true,
+          text: parsed.summary || text || 'Done.',
+          edits: parsed.edits,
+          ...(actions.length > 0 ? { actions } : {}),
+        };
       }
     }
+    // The panel reports what it did, so any text alongside is optional.
+    if (actions.length > 0) return { ok: true, text, actions };
 
     return text.length > 0
       ? { ok: true, text }

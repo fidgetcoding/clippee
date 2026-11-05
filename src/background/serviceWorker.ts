@@ -1,4 +1,5 @@
 import { NO_KEY, ask, clientFor, describe } from '../agent/client';
+import { isPanelState } from '../agent/panelTools';
 import { auditStructure } from '../agent/structure';
 import { structureSignals } from '../checks/structure';
 import type { AskRequest, AskResponse, AuditRequest, AuditResponse } from '../agent/types';
@@ -172,6 +173,7 @@ function isAskRequest(value: unknown): value is AskRequest {
       const t = turn as Record<string, unknown>;
       return (t.role === 'user' || t.role === 'assistant') && typeof t.text === 'string';
     }) && (v.canEdit === undefined || typeof v.canEdit === 'boolean') &&
+    (v.panel === undefined || isPanelState(v.panel)) &&
     (v.related === undefined || (Array.isArray(v.related) && v.related.every((passage: unknown) => {
       if (!passage || typeof passage !== 'object') return false;
       const p = passage as Record<string, unknown>;
