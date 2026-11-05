@@ -39,41 +39,28 @@ it('preserves unrelated saves from independent content and popup module contexts
   expect(content).not.toBe(popup);
   const [preferences] = await Promise.all([
     content.savePreferences({ muted: true }),
-    popup.saveSettings({ enabled: false }),
+    popup.saveSettings({ snoozeUntil: 5 }),
   ]);
-  expect(state.stored).toMatchObject({ muted: true, enabled: false });
+  expect(state.stored).toMatchObject({ muted: true, snoozeUntil: 5 });
   expect(preferences.apiKey).toBe('');
-});
-
-it('computes host mutations from latest state across independent callers', async () => {
-  vi.resetModules(); const first = await import('../src/settings');
-  vi.resetModules(); const second = await import('../src/settings');
-  await Promise.all([first.toggleHost('docs.google.com'), second.toggleHost('www.notion.so')]);
-  expect(state.stored.disabledHosts).toEqual(['docs.google.com', 'www.notion.so']);
-  await Promise.all([first.toggleHost('docs.google.com'), second.toggleHost('docs.google.com')]);
-  expect(state.stored.disabledHosts).toEqual(['www.notion.so', 'docs.google.com']);
-  expect(state.localGet).not.toHaveBeenCalled();
-});
-
-it('evaluates simultaneous mute toggles in the authoritative queue', async () => {
-  vi.resetModules(); const first = await import('../src/settings');
-  vi.resetModules(); const second = await import('../src/settings');
-  await Promise.all([first.toggleMuted(), second.toggleMuted()]);
-  expect(state.stored.muted).toBe(false);
 });
 
 it('rejects malformed mutation messages once without storage writes or credential leakage', async () => {
   const malformed = [
     undefined, null, [], {}, { kind: 'unknown' },
-    { kind: 'patch', patch: { enabled: 'false' } },
-    { kind: 'patch', patch: { disabledHosts: [123] } },
+    { kind: 'patch', patch: { muted: 'false' } },
+    // Switches Settings no longer has are refused, not stored.
+    { kind: 'patch', patch: { enabled: false } },
+    { kind: 'patch', patch: { disabledHosts: ['docs.google.com'] } },
+    { kind: 'patch', patch: { debugMode: true } },
+    { kind: 'patch', patch: { soundEnabled: true } },
     { kind: 'patch', patch: { snoozeUntil: Infinity } },
     { kind: 'patch', patch: { characterPack: '../popup' } },
     { kind: 'patch', patch: { apiKey: 'injected-key' } },
     { kind: 'patch', patch: { workspaceId: 'injected-workspace' } },
     { kind: 'patch', patch: { unknown: true } },
-    { kind: 'toggle-host', hostname: 'https://example.com/path' },
-    { kind: 'toggle-muted', apiKey: 'injected-key' },
+    { kind: 'toggle-host', hostname: 'docs.google.com' },
+    { kind: 'toggle-muted' },
   ];
   for (const mutation of malformed) {
     const reply = vi.fn();
@@ -84,19 +71,19 @@ it('rejects malformed mutation messages once without storage writes or credentia
   expect(state.syncSet).not.toHaveBeenCalled();
   expect(state.localGet).not.toHaveBeenCalled();
   const settings = await import('../src/settings');
-  await settings.savePreferences({ enabled: false });
-  expect(state.stored.enabled).toBe(false);
+  await settings.savePreferences({ muted: true });
+  expect(state.stored.muted).toBe(true);
 });
 
 it('replies to a failed storage read and continues queued mutations', async () => {
   const settings = await import('../src/settings');
   state.syncGet.mockRejectedValueOnce(new Error('Storage unavailable: local-secret'));
   const results = await Promise.allSettled([
-    settings.savePreferences({ enabled: false }), settings.savePreferences({ muted: true }),
+    settings.savePreferences({ snoozeUntil: 9 }), settings.savePreferences({ muted: true }),
   ]);
   expect(results[0]).toMatchObject({ status: 'rejected', reason: new Error('Could not save settings. Try again.') });
   expect(results[1]!.status).toBe('fulfilled');
-  expect(state.stored).toMatchObject({ enabled: true, muted: true });
+  expect(state.stored).toMatchObject({ snoozeUntil: 0, muted: true });
   expect(state.replies).toHaveLength(2);
   expect(JSON.stringify(state.replies)).not.toContain('local-secret');
 });
@@ -105,11 +92,11 @@ it('replies to a failed storage write and continues queued mutations', async () 
   const settings = await import('../src/settings');
   state.syncSet.mockRejectedValueOnce(new Error('Storage unavailable'));
   const results = await Promise.allSettled([
-    settings.savePreferences({ enabled: false }), settings.savePreferences({ debugMode: true }),
+    settings.savePreferences({ snoozeUntil: 9 }), settings.savePreferences({ muted: true }),
   ]);
   expect(results[0]!.status).toBe('rejected');
   expect(results[1]!.status).toBe('fulfilled');
-  expect(state.stored).toMatchObject({ enabled: true, debugMode: true });
+  expect(state.stored).toMatchObject({ snoozeUntil: 0, muted: true });
   expect(state.replies).toHaveLength(2);
 });
 
@@ -132,10 +119,10 @@ it('preserves separate local credential fields without sending either through pr
   vi.resetModules(); const secondPage = await import('../src/settings');
   await Promise.all([
     firstPage.saveSettings({ apiKey: 'replacement-key', muted: true }),
-    secondPage.saveSettings({ workspaceId: 'replacement-workspace', debugMode: true }),
+    secondPage.saveSettings({ workspaceId: 'replacement-workspace', snoozeUntil: 7 }),
   ]);
   expect(state.local).toMatchObject({ 'mrclippy:apiKey': 'replacement-key', 'mrclippy:workspaceId': 'replacement-workspace' });
-  expect(state.stored).toMatchObject({ muted: true, debugMode: true });
+  expect(state.stored).toMatchObject({ muted: true, snoozeUntil: 7 });
   expect(JSON.stringify(state.messages)).not.toMatch(/replacement-key|replacement-workspace/);
   expect(JSON.stringify(state.replies)).not.toMatch(/replacement-key|replacement-workspace/);
 });

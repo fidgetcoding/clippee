@@ -53,59 +53,6 @@ h1 .by {
   color: #6f5f45;
 }
 
-.rows {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px 0;
-  cursor: pointer;
-}
-
-.row span {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.35;
-}
-
-.row small {
-  font-size: 11.5px;
-  color: #6f5f45;
-}
-
-input[type="checkbox"] {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  accent-color: #1d6a55;
-  cursor: pointer;
-}
-
-.snooze {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #dcc285;
-}
-
-.snooze-label {
-  font-size: 13px;
-}
-
-.snooze-buttons {
-  display: flex;
-  gap: 6px;
-}
-
 button {
   font: inherit;
   font-size: 12.5px;
@@ -121,34 +68,44 @@ button:hover {
   background: #ece5cb;
 }
 
-button[aria-pressed="true"] {
-  background: #1d6a55;
-  border-color: #11473a;
-  color: #ffffff;
-}
-
 button:focus-visible {
   outline: 2px solid #1d6a55;
   outline-offset: 1px;
 }
 
-footer {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid #dcc285;
+/* Show or hide him on this tab, whatever state he got himself into. */
+.presence {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
 }
 
-footer button {
+button.big {
   width: 100%;
+  padding: 7px 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  background: #1d6a55;
+  border-color: #11473a;
+  color: #ffffff;
+}
+
+button.big:hover {
+  background: #185c4a;
+}
+
+button.big:disabled {
+  background: #d9d2bd;
+  border-color: #b5a888;
+  color: #6f5f45;
+  cursor: default;
 }
 
 .apikey {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding-bottom: 12px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid #dcc285;
 }
 
 .apikey label {

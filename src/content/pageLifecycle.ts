@@ -1,11 +1,21 @@
 import { ext } from '../platform';
-import { isActiveOn, loadPreferences, onSettingsChanged, type Settings } from '../settings';
+import { loadPreferences, onSettingsChanged, type Settings } from '../settings';
 
 export interface PageRuntime {
   readonly hidden: boolean;
   update(settings: Settings): void;
-  message(message: unknown): void;
+  /** Handle a message from the extension. A defined result is the reply. */
+  message(message: unknown): unknown;
   dispose(): void;
+}
+
+/** False once the extension was reloaded or removed under this copy of him. */
+export function contextAlive(): boolean {
+  try {
+    return typeof ext.runtime?.id === 'string' && ext.runtime.id.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /** Owns page listeners for the page's lifetime, including while Clippy is off. */
@@ -34,7 +44,7 @@ export function startPageLifecycle(
       url = location.href;
       stopRuntime();
     }
-    if (!settings || !eligible() || !isActiveOn(settings, location.hostname)) {
+    if (!settings || !eligible()) {
       stopRuntime();
       return;
     }
@@ -44,7 +54,7 @@ export function startPageLifecycle(
     const startedAt = location.href;
     attempt = token;
     const current = (): boolean => !disposed && !suspended && attempt === token &&
-      startedAt === location.href && eligible() && !!settings && isActiveOn(settings, location.hostname);
+      startedAt === location.href && eligible() && !!settings;
     void mount(settings, current, restoreHidden).then((mounted) => {
       if (!current()) mounted?.dispose();
       else if (mounted) {
@@ -85,17 +95,54 @@ export function startPageLifecycle(
   };
   readPreferences();
 
-  const onMessage = (message: unknown): void => {
+  const onMessage = (message: unknown, _sender: unknown, reply?: (response: unknown) => void): void => {
     if (disposed || suspended) return;
+    const type = (message as { type?: unknown } | null)?.type;
+    // Settings' Show button: whatever kept him from mounting, try again now.
+    if (type === 'mrclippy:force-show' && !runtime) restoreHidden = false;
     reconcile();
-    runtime?.message(message);
+    let answer = runtime?.message(message);
+    // Alive but not mounted (still starting, or not a page he works on): say so,
+    // so Settings never mistakes this copy for a dead one and adds a second.
+    if (answer === undefined && typeof type === 'string' && /^mrclippy:(presence|force-show|force-hide)$/.test(type)) {
+      answer = { here: type === 'mrclippy:force-show' && attempt !== undefined };
+    }
+    if (answer !== undefined) reply?.(answer);
+  };
+
+  /**
+   * An extension reload leaves this copy running in the page with a dead
+   * connection: nothing it asks the extension for works again, and the new
+   * copy gets put in beside it. A port to the worker breaks the moment that
+   * happens; this copy then takes itself down, his host and timers with it.
+   * The port also drops when the worker merely sleeps, so it reconnects then.
+   */
+  const watchContext = (): void => {
+    if (disposed) return;
+    let port: chrome.runtime.Port;
+    try {
+      port = ext.runtime.connect({ name: 'mrclippy:page' });
+    } catch {
+      dispose();
+      return;
+    }
+    port.onDisconnect.addListener(() => {
+      if (disposed) return;
+      if (!contextAlive()) dispose();
+      else setTimeout(watchContext, 1_000);
+    });
   };
   const dispose = (): void => {
     if (disposed) return;
     disposed = true;
-    stopRuntime();
-    stopWatching();
-    ext.runtime.onMessage.removeListener(onMessage);
+    // Each step on its own: in a dead context the extension calls throw, and
+    // the page's own listeners and his host must still come off.
+    const safely = (step: () => void): void => {
+      try { step(); } catch { /* the extension is gone */ }
+    };
+    safely(stopRuntime);
+    safely(stopWatching);
+    safely(() => ext.runtime.onMessage.removeListener(onMessage));
     window.removeEventListener('pagehide', onPageHide);
     window.removeEventListener('pageshow', onPageShow);
     window.removeEventListener('popstate', reconcile);
@@ -119,6 +166,7 @@ export function startPageLifecycle(
     readPreferences();
   };
   ext.runtime.onMessage.addListener(onMessage);
+  if (typeof ext.runtime.connect === 'function') watchContext();
   window.addEventListener('pagehide', onPageHide);
   window.addEventListener('pageshow', onPageShow);
   window.addEventListener('popstate', reconcile);

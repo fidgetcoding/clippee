@@ -89,7 +89,11 @@ export class DocHistory implements HistoryApi {
   ) {}
 
   dispose(): void {
-    if (this.listeners.size > 0) ext.storage?.onChanged?.removeListener(this.onStorage);
+    try {
+      if (this.listeners.size > 0) ext.storage?.onChanged?.removeListener(this.onStorage);
+    } catch {
+      // A dead extension context: nothing left to unhook.
+    }
     this.listeners.clear();
   }
 

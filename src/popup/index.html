@@ -11,8 +11,13 @@
       <p id="status">Watching</p>
     </header>
 
+    <section class="presence">
+      <button type="button" id="presence" class="big" disabled>Show Clippee</button>
+      <p class="hint" id="presence-hint" hidden></p>
+    </section>
+
     <section class="apikey" id="apikey-section">
-      <label for="apikey">Step 1 · Your Claude API key</label>
+      <label for="apikey">Your Claude API key</label>
       <input type="password" id="apikey" placeholder="Paste sk-ant-… here" autocomplete="off" spellcheck="false" />
       <p class="hint" id="apikey-hint">Needed to chat with him. Stored on this machine only, never synced.</p>
       <a class="getkey" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get a key →</a>
@@ -24,46 +29,6 @@
         <p class="hint">Or make the key inside a workspace in the Console and skip this.</p>
       </details>
     </section>
-
-    <section class="rows">
-      <label class="row">
-        <span>Enabled</span>
-        <input type="checkbox" id="enabled" />
-      </label>
-
-      <label class="row">
-        <span>Mute suggestions<small>Clicking him still works</small></span>
-        <input type="checkbox" id="muted" />
-      </label>
-
-      <label class="row">
-        <span>On this site<small id="host">—</small></span>
-        <input type="checkbox" id="host-enabled" />
-      </label>
-
-      <label class="row">
-        <span>Sounds</span>
-        <input type="checkbox" id="sound" />
-      </label>
-
-      <label class="row">
-        <span>Test mode<small>No rate limit. He gets chatty.</small></span>
-        <input type="checkbox" id="debug" />
-      </label>
-    </section>
-
-    <section class="snooze">
-      <span class="snooze-label">Snooze</span>
-      <div class="snooze-buttons">
-        <button type="button" data-snooze="15 minutes">15m</button>
-        <button type="button" data-snooze="1 hour">1h</button>
-        <button type="button" data-snooze="Rest of today">Today</button>
-      </div>
-    </section>
-
-    <footer>
-      <button type="button" id="reset-dismissals">Forget what I've dismissed</button>
-    </footer>
 
     <script type="module" src="./popup.ts"></script>
   </body>

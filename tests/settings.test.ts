@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_SETTINGS,
-  isActiveOn,
   isSilenced,
   type Settings,
 } from '../src/settings';
@@ -9,22 +8,6 @@ import {
 function make(patch: Partial<Settings> = {}): Settings {
   return { ...DEFAULT_SETTINGS, ...patch };
 }
-
-describe('activation', () => {
-  it('is on by default', () => {
-    expect(isActiveOn(make(), 'docs.google.com')).toBe(true);
-  });
-
-  it('respects the master switch', () => {
-    expect(isActiveOn(make({ enabled: false }), 'docs.google.com')).toBe(false);
-  });
-
-  it('stays away from a disabled host without affecting others', () => {
-    const settings = make({ disabledHosts: ['mail.google.com'] });
-    expect(isActiveOn(settings, 'mail.google.com')).toBe(false);
-    expect(isActiveOn(settings, 'docs.google.com')).toBe(true);
-  });
-});
 
 describe('silence', () => {
   it('is not silenced by default', () => {
@@ -48,10 +31,8 @@ describe('silence', () => {
 });
 
 describe('defaults', () => {
-  it('ships quiet: no sound, no test mode', () => {
-    // Test mode drops the rate cap, which makes him exactly the eager assistant
-    // the research says people dislike. It must never be the default.
-    expect(DEFAULT_SETTINGS.debugMode).toBe(false);
-    expect(DEFAULT_SETTINGS.soundEnabled).toBe(false);
+  it('has no switches left that could keep him off, loud or in test mode', () => {
+    expect(Object.keys(DEFAULT_SETTINGS).sort()).toEqual(['apiKey', 'characterPack', 'muted', 'snoozeUntil', 'workspaceId']);
+    expect(DEFAULT_SETTINGS.muted).toBe(false);
   });
 });

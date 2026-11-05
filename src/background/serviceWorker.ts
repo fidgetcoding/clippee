@@ -3,6 +3,7 @@ import { isPanelState } from '../agent/panelTools';
 import { auditStructure } from '../agent/structure';
 import { structureSignals } from '../checks/structure';
 import type { AskRequest, AskResponse, AuditRequest, AuditResponse } from '../agent/types';
+import { matchesPattern } from '../matchPattern';
 import { ext } from '../platform';
 import { loadSettings } from '../settings';
 import { parseSettingsMutation, type SettingsResponse } from '../settingsProtocol';
@@ -39,11 +40,58 @@ function setAway(tabId: number, away: boolean): Promise<void> {
 ext.action?.onClicked?.addListener((tab) => {
   if (tab.id === undefined) return;
   const tabId = tab.id;
-  void ext.tabs.sendMessage(tabId, { type: 'mrclippy:summon' }).catch(() => {
-    // Nobody on this tab to summon (it navigated somewhere he doesn't run):
-    // the popup comes back, and this click opens Settings.
-    void setAway(tabId, false).then(() => openSettings(tab.url)).catch(() => undefined);
+  void ext.tabs.sendMessage(tabId, { type: 'mrclippy:summon' }).catch(async () => {
+    // Nobody answered. On one of his pages that is a copy left dead by an
+    // extension reload: a fresh one goes in and makes his entrance. Anywhere
+    // else the popup comes back, and this click opens Settings.
+    await setAway(tabId, false).catch(() => undefined);
+    if (!(await injectInto(tabId))) await openSettings(tab.url).catch(() => undefined);
   });
+});
+
+/** The content scripts that run in his own isolated world, as the loaded manifest lists them. */
+function contentScripts(): { matches: string[]; js: string[]; allFrames: boolean }[] {
+  return (ext.runtime.getManifest().content_scripts ?? [])
+    .filter((cs) => (cs as { world?: string }).world !== 'MAIN' && (cs.js?.length ?? 0) > 0)
+    .map((cs) => ({ matches: cs.matches ?? [], js: cs.js ?? [], allFrames: cs.all_frames === true }));
+}
+
+/**
+ * Put a fresh copy of him into a tab that has none (an extension reload
+ * leaves open docs with a dead one, and Chrome won't add the new version
+ * until the page reloads). The Docs reader that has to start with the page
+ * is left alone: a copy from before the reload keeps serving, and a doc
+ * opened before he was installed still needs a reload to be read.
+ */
+async function injectInto(tabId: number): Promise<boolean> {
+  try {
+    const tab = await ext.tabs.get(tabId);
+    const scripts = contentScripts().filter((cs) => cs.matches.some((p) => matchesPattern(tab.url, p)));
+    for (const cs of scripts) {
+      await ext.scripting.executeScript({ target: { tabId, allFrames: cs.allFrames }, files: cs.js });
+    }
+    return scripts.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+// Installed, updated or reloaded: every open doc gets a live copy of him now,
+// not at its next reload. The dead copies take themselves down.
+ext.runtime.onInstalled?.addListener(() => {
+  void (async () => {
+    const tabs = await ext.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id !== undefined && contentScripts().some((cs) => cs.matches.some((p) => matchesPattern(tab.url, p)))) {
+        await injectInto(tab.id);
+      }
+    }
+  })().catch(() => undefined);
+});
+
+// Each page holds a port open so it learns the moment the extension goes away.
+ext.runtime.onConnect?.addListener((port) => {
+  if (port.name !== 'mrclippy:page') port.disconnect();
 });
 
 // A new page in the tab starts with Settings on the button; his page says if he's away.
@@ -69,6 +117,13 @@ ext.runtime.onMessage.addListener(
       const tabId = sender.tab?.id;
       if (tabId !== undefined) void setAway(tabId, (message as { away?: unknown }).away === true).catch(() => undefined);
       return false;
+    }
+    if (isType(message, 'mrclippy:inject')) {
+      // Settings' Show button found nobody on the tab. Only extension pages ask.
+      const tabId = (message as { tabId?: unknown }).tabId;
+      if (sender.tab || typeof tabId !== 'number') return false;
+      void injectInto(tabId).then((ok) => sendResponse({ ok, error: ok ? '' : 'Not one of his pages.' } as never));
+      return true;
     }
     if (isType(message, 'mrclippy:open-settings')) {
       void openSettings(sender.tab?.url).catch(() => undefined);

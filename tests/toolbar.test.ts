@@ -7,6 +7,10 @@ const sw = vi.hoisted(() => ({
   setPopup: vi.fn(async (_options: { tabId: number; popup: string }) => undefined),
   openPopup: vi.fn(async () => undefined),
   sendMessage: vi.fn(async () => undefined),
+  installed: undefined as undefined | (() => void),
+  connected: undefined as undefined | ((port: { name: string; disconnect: () => void }) => void),
+  executeScript: vi.fn(async (_o: { target: { tabId: number; allFrames: boolean }; files: string[] }) => []),
+  tabs: [] as { id: number; url: string }[],
 }));
 vi.mock('../src/platform', () => ({
   ext: {
@@ -14,7 +18,14 @@ vi.mock('../src/platform', () => ({
       onMessage: { addListener: (fn: typeof sw.message) => { sw.message = fn; } },
       sendMessage: sw.sendMessage,
       getURL: (p: string) => p,
+      getManifest: () => ({ content_scripts: [
+        { matches: ['*://docs.google.com/document/d/*'], js: ['assets/index.ts-loader.js'], all_frames: true },
+        { matches: ['*://docs.google.com/document/*'], js: ['assets/gdocsMain.ts-loader.js'], world: 'MAIN' },
+      ] }),
+      onInstalled: { addListener: (fn: typeof sw.installed) => { sw.installed = fn; } },
+      onConnect: { addListener: (fn: typeof sw.connected) => { sw.connected = fn; } },
     },
+    scripting: { executeScript: sw.executeScript },
     action: {
       setPopup: sw.setPopup,
       openPopup: sw.openPopup,
@@ -22,6 +33,8 @@ vi.mock('../src/platform', () => ({
     },
     tabs: {
       sendMessage: sw.sendMessage,
+      get: async (id: number) => sw.tabs.find((t) => t.id === id) ?? { id, url: '' },
+      query: async () => sw.tabs,
       onUpdated: { addListener: (fn: typeof sw.updated) => { sw.updated = fn; } },
     },
   },
@@ -36,6 +49,8 @@ afterEach(() => {
   sw.setPopup.mockClear();
   sw.openPopup.mockClear();
   sw.sendMessage.mockReset().mockResolvedValue(undefined);
+  sw.executeScript.mockClear();
+  sw.tabs = [];
 });
 
 describe('the toolbar button', () => {
@@ -55,6 +70,16 @@ describe('the toolbar button', () => {
     await import('../src/background/serviceWorker');
     sw.clicked!({ id: 7, url: 'https://docs.google.com/document/d/x/edit' });
     await vi.waitFor(() => expect(sw.sendMessage).toHaveBeenCalledWith(7, { type: 'mrclippy:summon' }));
+    expect(sw.openPopup).not.toHaveBeenCalled();
+  });
+
+  it('puts a fresh copy into a doc whose copy died, instead of opening Settings', async () => {
+    await import('../src/background/serviceWorker');
+    sw.tabs = [{ id: 7, url: 'https://docs.google.com/document/d/x/edit' }];
+    sw.sendMessage.mockRejectedValueOnce(new Error('Receiving end does not exist.'));
+    sw.clicked!({ id: 7, url: 'https://docs.google.com/document/d/x/edit' });
+    await vi.waitFor(() => expect(sw.executeScript).toHaveBeenCalled());
+    expect(sw.executeScript).toHaveBeenCalledWith({ target: { tabId: 7, allFrames: true }, files: ['assets/index.ts-loader.js'] });
     expect(sw.openPopup).not.toHaveBeenCalled();
   });
 
@@ -137,5 +162,45 @@ describe('coming back on his own', () => {
     await vi.advanceTimersByTimeAsync(1_000);
     expect(agent.isVisible).toBe(true);
     presence.dispose();
+  });
+});
+
+describe('a fresh copy of him', () => {
+  it('goes in when Settings asks, his own scripts only, never the Docs reader that must start with the page', async () => {
+    await import('../src/background/serviceWorker');
+    sw.tabs = [{ id: 7, url: 'https://docs.google.com/document/d/x/edit' }];
+    const reply = vi.fn();
+    expect(sw.message!({ type: 'mrclippy:inject', tabId: 7 }, {}, reply)).toBe(true);
+    await vi.waitFor(() => expect(reply).toHaveBeenCalledWith({ ok: true, error: '' }));
+    expect(sw.executeScript).toHaveBeenCalledTimes(1);
+    expect(sw.executeScript.mock.calls[0]![0].files).toEqual(['assets/index.ts-loader.js']);
+  });
+
+  it('is refused to a page that asks for it', async () => {
+    await import('../src/background/serviceWorker');
+    expect(sw.message!({ type: 'mrclippy:inject', tabId: 7 }, { tab: { id: 7 } }, () => {})).toBe(false);
+    expect(sw.executeScript).not.toHaveBeenCalled();
+  });
+
+  it('goes into every open doc when the extension is installed, updated or reloaded', async () => {
+    await import('../src/background/serviceWorker');
+    sw.tabs = [
+      { id: 1, url: 'https://docs.google.com/document/d/a/edit' },
+      { id: 2, url: 'https://mail.google.com/' },
+      { id: 3, url: 'https://docs.google.com/document/d/b/edit' },
+    ];
+    sw.installed!();
+    await vi.waitFor(() => expect(sw.executeScript).toHaveBeenCalledTimes(2));
+    expect(sw.executeScript.mock.calls.map(([o]) => o.target.tabId)).toEqual([1, 3]);
+  });
+
+  it('keeps each page\'s port open so a dead copy hears about it', async () => {
+    await import('../src/background/serviceWorker');
+    const ours = { name: 'mrclippy:page', disconnect: vi.fn() };
+    const stranger = { name: 'other', disconnect: vi.fn() };
+    sw.connected!(ours);
+    sw.connected!(stranger);
+    expect(ours.disconnect).not.toHaveBeenCalled();
+    expect(stranger.disconnect).toHaveBeenCalled();
   });
 });

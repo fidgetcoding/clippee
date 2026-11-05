@@ -1,15 +1,9 @@
-import { ext } from '../platform';
 import {
-  SNOOZE_DURATIONS_MS,
-  isSilenced,
   loadSettings,
   saveSettings,
-  snooze,
-  toggleHost,
   type Settings,
 } from '../settings';
-
-const DISMISSAL_KEY = 'mrclippy:dismissals';
+import { askTab, isHisPage, setPresence, targetTab, type TabPresence } from './presenceButton';
 
 function el<T extends HTMLElement>(id: string): T {
   const node = document.getElementById(id);
@@ -17,56 +11,55 @@ function el<T extends HTMLElement>(id: string): T {
   return node as T;
 }
 
-async function currentHost(): Promise<string | undefined> {
-  // Opened from Clippy as its own window: the page it came from rides along.
-  const passed = new URLSearchParams(location.search).get('host');
-  if (passed) return passed;
-  const [tab] = await ext.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.url) return undefined;
-  try {
-    // Opened as Options, the active tab is chrome://extensions: no site.
-    const url = new URL(tab.url);
-    return url.protocol === 'http:' || url.protocol === 'https:' ? url.hostname : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function describe(settings: Settings, host: string | undefined): string {
-  if (!settings.enabled) return 'Off';
-  if (host && settings.disabledHosts.includes(host)) return `Off on ${host}`;
-  if (settings.muted) return 'Muted — click him to ask';
+/** The line under the name. "Snoozed" only ever means a snooze somebody asked for. */
+function describe(settings: Settings): string {
+  if (settings.muted) return 'Muted. Say "unmute" in his chat to undo.';
   if (settings.snoozeUntil > Date.now()) {
     const minutes = Math.ceil((settings.snoozeUntil - Date.now()) / 60_000);
     return `Snoozed ${minutes} more minute${minutes === 1 ? '' : 's'}`;
   }
-  if (settings.debugMode) return 'Test mode — no rate limit';
   return 'Watching';
 }
 
-function paint(settings: Settings, host: string | undefined): void {
-  el<HTMLInputElement>('enabled').checked = settings.enabled;
-  el<HTMLInputElement>('muted').checked = settings.muted;
-  el<HTMLInputElement>('sound').checked = settings.soundEnabled;
-  el<HTMLInputElement>('debug').checked = settings.debugMode;
-
-  const hostToggle = el<HTMLInputElement>('host-enabled');
-  hostToggle.checked = host ? !settings.disabledHosts.includes(host) : false;
-  hostToggle.disabled = !host;
-  el('host').textContent = host ?? 'no site';
-
-  el('status').textContent = describe(settings, host);
-
-  const silenced = isSilenced(settings);
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-snooze]')) {
-    button.setAttribute('aria-pressed', String(silenced && settings.snoozeUntil > Date.now()));
+/** Show Clippee / Hide Clippee, for the doc in front of you. */
+async function wirePresence(): Promise<void> {
+  const button = el<HTMLButtonElement>('presence');
+  const hint = el('presence-hint');
+  const say = (text: string): void => {
+    hint.textContent = text;
+    hint.hidden = text === '';
+  };
+  const tab = await targetTab();
+  if (tab?.id === undefined || !isHisPage(tab.url)) {
+    button.disabled = true;
+    say('Open a Google Doc and he\u2019ll be there.');
+    return;
   }
+  const tabId = tab.id;
+  let state: TabPresence = await askTab(tabId);
+  const paint = (): void => {
+    const here = state !== 'missing' && state.here;
+    button.textContent = here ? 'Hide Clippee' : 'Show Clippee';
+    button.disabled = false;
+  };
+  paint();
+  button.addEventListener('click', () => {
+    const show = state === 'missing' || !state.here;
+    button.disabled = true;
+    void setPresence(tabId, show, state)
+      .then((next) => {
+        state = next;
+        say('');
+      })
+      .catch(() => say('Couldn\u2019t reach that tab. Reload it and try again.'))
+      .finally(paint);
+  });
 }
 
 async function main(): Promise<void> {
-  const host = await currentHost();
+  void wirePresence().catch(() => undefined);
   let settings = await loadSettings();
-  paint(settings, host);
+  el('status').textContent = describe(settings);
 
   const keyField = el<HTMLInputElement>('apikey');
   const keyHint = el('apikey-hint');
@@ -114,52 +107,6 @@ async function main(): Promise<void> {
   // A paste is the whole key at once, and the popup can close before blur fires.
   keyField.addEventListener('paste', () => setTimeout(persistKey, 0));
   keyField.addEventListener('change', persistKey);
-
-  const bind = (id: string, key: keyof Settings): void => {
-    el<HTMLInputElement>(id).addEventListener('change', (event) => {
-      const checked = (event.target as HTMLInputElement).checked;
-      void saveSettings({ [key]: checked } as Partial<Settings>).then((next) => {
-        settings = next;
-        paint(settings, host);
-      });
-    });
-  };
-
-  bind('enabled', 'enabled');
-  bind('muted', 'muted');
-  bind('sound', 'soundEnabled');
-  bind('debug', 'debugMode');
-
-  el<HTMLInputElement>('host-enabled').addEventListener('change', () => {
-    if (!host) return;
-    void toggleHost(host).then((next) => {
-      // The worker's preference reply deliberately contains no credentials.
-      settings = { ...next, apiKey: settings.apiKey, workspaceId: settings.workspaceId };
-      paint(settings, host);
-    });
-  });
-
-  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-snooze]')) {
-    button.addEventListener('click', () => {
-      const label = button.dataset.snooze as keyof typeof SNOOZE_DURATIONS_MS;
-      const duration = SNOOZE_DURATIONS_MS[label];
-      if (duration === undefined) return;
-      void snooze(duration).then((next) => {
-        settings = next;
-        paint(settings, host);
-      });
-    });
-  }
-
-  el<HTMLButtonElement>('reset-dismissals').addEventListener('click', (event) => {
-    const button = event.currentTarget as HTMLButtonElement;
-    void ext.storage.local.remove(DISMISSAL_KEY).then(() => {
-      button.textContent = 'Forgotten. He gets another go.';
-      setTimeout(() => {
-        button.textContent = "Forget what I've dismissed";
-      }, 2_000);
-    });
-  });
 }
 
 void main().catch((error: unknown) => {

@@ -2,31 +2,19 @@ import { ext, hasExtensionApis } from './platform';
 import type { Preferences, SettingsMutation } from './settingsProtocol';
 
 /**
- * User controls.
+ * What he remembers about how you want him.
  *
- * These are not a nice-to-have. The controls people reach for before
- * uninstalling — mute, snooze, not-on-this-site — are the difference between an
- * assistant they tolerate on a bad day and one they remove. Every one of them
- * has to work without opening a settings page, which is why the popup is three
- * toggles and a slider rather than a preferences tree.
+ * Settings itself is only the API key now. Muting and snoozing live in the
+ * chat ("mute", "snooze 1h"), and his X sends him off for a while, so nobody
+ * has to open a preferences page to get some quiet. Older versions also stored
+ * a master switch, per-site switches, sounds and a test mode; those are read
+ * past and never come back on.
  */
 export interface Settings {
-  /** Master switch. Off means the character does not mount at all. */
-  enabled: boolean;
-  /** Proactive suggestions suppressed; explicit clicks still answer. */
+  /** Proactive suggestions suppressed; explicit clicks still answer. Set from the chat. */
   muted: boolean;
-  /** Epoch ms. Muted until this passes. */
+  /** Epoch ms. Muted until this passes. Set only by a snooze somebody asked for. */
   snoozeUntil: number;
-  /** Hostnames where Clippee stays away entirely. */
-  disabledHosts: string[];
-  /** Frames the character but plays no sounds by default. */
-  soundEnabled: boolean;
-  /**
-   * Testing aid: drops the ten-minute rate cap and the fifteen-second silence
-   * floor so suggestions surface immediately. Ships off — with it on, Clippee is
-   * exactly the eager assistant the research says people dislike.
-   */
-  debugMode: boolean;
   /** Character pack directory name under `src/packs/`. */
   characterPack: string;
   /**
@@ -42,12 +30,8 @@ export interface Settings {
 }
 
 export const DEFAULT_SETTINGS: Readonly<Settings> = {
-  enabled: true,
   muted: false,
   snoozeUntil: 0,
-  disabledHosts: [],
-  soundEnabled: false,
-  debugMode: false,
   characterPack: 'clippee',
   apiKey: '',
   workspaceId: '',
@@ -63,18 +47,22 @@ export const SNOOZE_DURATIONS_MS = {
   'Rest of today': 8 * 60 * 60_000,
 } as const;
 
+/**
+ * Written with every save since Settings shrank. A record without it is from an
+ * older version, whose "Mute suggestions" box is gone: its mute is dropped so
+ * nobody is left muted with no switch in sight. A mute asked for in the chat
+ * since then carries the mark and stays.
+ */
+export const SETTINGS_FORMAT = 2;
+
 function coerce(raw: unknown): Settings {
-  if (raw === null || typeof raw !== 'object') return { ...DEFAULT_SETTINGS, disabledHosts: [] };
-  const value = raw as Partial<Settings>;
+  if (raw === null || typeof raw !== 'object') return { ...DEFAULT_SETTINGS };
+  const value = raw as Partial<Settings> & { v?: unknown };
+  const current = value.v === SETTINGS_FORMAT;
   return {
-    enabled: typeof value.enabled === 'boolean' ? value.enabled : DEFAULT_SETTINGS.enabled,
-    muted: typeof value.muted === 'boolean' ? value.muted : DEFAULT_SETTINGS.muted,
+    muted: current && typeof value.muted === 'boolean' ? value.muted : DEFAULT_SETTINGS.muted,
     snoozeUntil: typeof value.snoozeUntil === 'number' && Number.isFinite(value.snoozeUntil)
       ? Math.max(0, value.snoozeUntil) : 0,
-    disabledHosts: Array.isArray(value.disabledHosts)
-      ? value.disabledHosts.filter((h): h is string => typeof h === 'string') : [],
-    soundEnabled: typeof value.soundEnabled === 'boolean' ? value.soundEnabled : DEFAULT_SETTINGS.soundEnabled,
-    debugMode: typeof value.debugMode === 'boolean' ? value.debugMode : DEFAULT_SETTINGS.debugMode,
     characterPack: typeof value.characterPack === 'string' && /^[a-z0-9][a-z0-9_-]*$/i.test(value.characterPack)
       ? value.characterPack : DEFAULT_SETTINGS.characterPack,
     apiKey: '',
@@ -84,13 +72,13 @@ function coerce(raw: unknown): Settings {
 
 /** Content scripts read preferences only; credentials stay in extension pages/worker. */
 export async function loadPreferences(): Promise<Settings> {
-  if (!hasExtensionApis()) return { ...DEFAULT_SETTINGS, disabledHosts: [] };
+  if (!hasExtensionApis()) return { ...DEFAULT_SETTINGS };
   const stored = await ext.storage.sync.get(KEY);
   return coerce(stored[KEY]);
 }
 
 export async function loadSettings(): Promise<Settings> {
-  if (!hasExtensionApis()) return { ...DEFAULT_SETTINGS, disabledHosts: [] };
+  if (!hasExtensionApis()) return { ...DEFAULT_SETTINGS };
   // Preferences sync across the user's machines; the API key deliberately does
   // not — `storage.sync` is replicated through the browser account.
   const [synced, local] = await Promise.all([
@@ -135,11 +123,6 @@ async function requestMutation(mutation: SettingsMutation): Promise<Settings> {
   return coerce(reply.preferences);
 }
 
-/** Read-modify-write toggles are evaluated inside the worker's shared queue. */
-export function toggleMuted(): Promise<Settings> {
-  return requestMutation({ kind: 'toggle-muted' });
-}
-
 export function onSettingsChanged(listener: (settings: Settings) => void): () => void {
   if (!hasExtensionApis()) return () => {};
   const handler = (
@@ -153,12 +136,6 @@ export function onSettingsChanged(listener: (settings: Settings) => void): () =>
   return () => ext.storage.onChanged.removeListener(handler);
 }
 
-/** Should Clippee appear on this host at all? */
-export function isActiveOn(settings: Settings, hostname: string): boolean {
-  if (!settings.enabled) return false;
-  return !settings.disabledHosts.includes(hostname);
-}
-
 /** Muted right now — explicitly, or because a snooze is still running. */
 export function isSilenced(settings: Settings, now = Date.now()): boolean {
   return settings.muted || settings.snoozeUntil > now;
@@ -166,8 +143,4 @@ export function isSilenced(settings: Settings, now = Date.now()): boolean {
 
 export async function snooze(durationMs: number): Promise<Settings> {
   return saveSettings({ snoozeUntil: Date.now() + durationMs });
-}
-
-export function toggleHost(hostname: string): Promise<Settings> {
-  return requestMutation({ kind: 'toggle-host', hostname });
 }

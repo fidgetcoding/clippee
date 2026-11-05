@@ -10,7 +10,6 @@ import {
   SNOOZE_DURATIONS_MS,
   isSilenced,
   savePreferences,
-  toggleMuted,
   type Settings,
 } from '../settings';
 import { resolveSource } from './documentSource';
@@ -24,7 +23,7 @@ import type { PanelState, SnoozeLength } from '../agent/panelTools';
 import { DocEdits } from './docEdits';
 import { startPageLifecycle, type PageRuntime } from './pageLifecycle';
 import {
-  GREETING_WAVE_FRAME, Presence, RETURN_AFTER_MS, prefersReducedMotion, reportAway, returnWhenSeen,
+  GREETING_WAVE_FRAME, Presence, prefersReducedMotion, reportAway, returnWhenSeen,
 } from './presence';
 import { askForKey, hasApiKey, openSettings } from './settingsLink';
 import { askWorker, auditWorker } from './workerClient';
@@ -39,10 +38,6 @@ const SNOOZE_MS: Readonly<Record<SnoozeLength, number>> = {
   '1h': SNOOZE_DURATIONS_MS['1 hour'],
   today: SNOOZE_DURATIONS_MS['Rest of today'],
 };
-
-/** Test mode drops both gates so suggestions surface immediately. */
-const DEBUG_GAP_MS = 5_000;
-const DEBUG_SILENCE_MS = 3_000;
 
 /** The greeting holds for 7s; the key prompt follows once it has cleared. */
 const KEY_PROMPT_DELAY_MS = 9_000;
@@ -69,9 +64,7 @@ async function mountRuntime(
   const dismissals = (stored[DISMISSAL_KEY] ?? {}) as Record<string, number>;
 
   const queue = new SuggestionQueue({ dismissals });
-  const detector = new BreakpointDetector(
-    settings.debugMode ? { minSilenceMs: DEBUG_SILENCE_MS } : {},
-  );
+  const detector = new BreakpointDetector();
 
   let releasePanel: (() => void) | undefined;
   let disposed = false;
@@ -82,12 +75,12 @@ async function mountRuntime(
     ...(layout.agent ? { position: layout.agent } : {}),
     onMoved: (position) => void saveLayout({ agent: position }),
     onClick: () => onAgentClick(),
-    // X: he leaves with an exit, and tips stay quiet for exactly as long as he
-    // is gone. He comes back on his own, or with the toolbar button.
+    // X: he leaves with an exit and comes back on his own, or with the toolbar
+    // button. Being away is not a snooze: no tips can show while he's gone, and
+    // Settings says "Snoozed" only for a snooze somebody chose.
     onDismiss: () => {
       closePanel();
       presence.leave();
-      void savePreferences({ snoozeUntil: Date.now() + RETURN_AFTER_MS }).catch(() => undefined);
     },
   });
   host.root.append(agent.root, agent.balloon.el);
@@ -112,7 +105,6 @@ async function mountRuntime(
   });
 
   const renderer = new Renderer(agent, queue, detector, {
-    ...(settings.debugMode ? { minGapMs: DEBUG_GAP_MS } : {}),
     onShown: (suggestion) => {
       // One line, two buttons, plus a way into the full panel. A proactive
       // interruption should stay small — the user did not ask for it.
@@ -410,10 +402,21 @@ async function mountRuntime(
   };
   window.addEventListener('focus', onFocus);
 
-  const onMessage = (message: unknown): void => {
-    if (!message || typeof message !== 'object') return;
+  const onMessage = (message: unknown): unknown => {
+    if (!message || typeof message !== 'object') return undefined;
     const type = (message as { type?: unknown }).type;
-    if (disposed) return;
+    if (disposed) return undefined;
+    // Settings asks where he is, and its Show / Hide put him there outright.
+    if (type === 'mrclippy:presence') return { here: presence.here };
+    if (type === 'mrclippy:force-show') {
+      presence.force('present');
+      return { here: true };
+    }
+    if (type === 'mrclippy:force-hide') {
+      closePanel();
+      presence.force('away');
+      return { here: false };
+    }
     // The shortcut sends him off or calls him back, with the same entrances
     // and exits as X and the toolbar button.
     if (type === 'mrclippy:toggle') {
@@ -429,9 +432,7 @@ async function mountRuntime(
         openSettings();
       }
     }
-    if (type === 'mrclippy:mute') {
-      void toggleMuted().catch(() => undefined);
-    }
+    return undefined;
   };
 
   function teardown(): void {

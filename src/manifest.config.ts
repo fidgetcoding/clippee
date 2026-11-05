@@ -25,7 +25,9 @@ export default defineManifest({
     128: 'src/icons/icon-128.png',
   },
 
-  permissions: ['storage', 'tabs'],
+  // scripting: a reload of the extension leaves open docs with a dead copy of
+  // him; the worker puts a fresh one in (Settings' Show button, onInstalled).
+  permissions: ['storage', 'tabs', 'scripting'],
 
   // Without this key `chrome.action` is undefined, and the background script's
   // click handler silently never fires — the toolbar button appears to do
@@ -47,8 +49,16 @@ export default defineManifest({
   },
 
   // Cross-origin requests go only to the model API and the dormant Drive client.
-  // Editor injection is scoped separately by content_scripts below.
-  host_permissions: ['https://api.anthropic.com/*', 'https://www.googleapis.com/*'],
+  // Plus the editors he runs on, so a fresh copy of him can be put into a tab
+  // that is already open.
+  host_permissions: [
+    'https://api.anthropic.com/*',
+    'https://www.googleapis.com/*',
+    'https://docs.google.com/*',
+    'https://*.officeapps.live.com/*',
+    'https://www.notion.so/*',
+    'https://*.notion.site/*',
+  ],
 
   background: isFirefox
     ? { scripts: ['src/background/serviceWorker.ts'], type: 'module' }

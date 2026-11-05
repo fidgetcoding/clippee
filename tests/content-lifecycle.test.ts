@@ -84,59 +84,6 @@ it('does not attach old findings to an editor selected during the opening read',
 function changeSettings(next: Record<string, unknown>): void {
   for (const watcher of state.watchers) watcher({ 'mrclippy:settings': { newValue: next } }, 'sync');
 }
-it('mounts when enabled after starting with the master switch off', async () => {
-  vi.useFakeTimers();
-  state.syncGet.mockResolvedValue({ 'mrclippy:settings': { enabled: false } });
-  await import('../src/content/index');
-  await vi.advanceTimersByTimeAsync(1);
-  expect(document.querySelector('#mrclippy-host')).toBeNull();
-  changeSettings({ enabled: true });
-  await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')?.shadowRoot?.querySelector('.mrclippy-agent')).toBeTruthy());
-});
-
-it('restarts across host off/on and master off/on without duplicating the page listeners', async () => {
-  vi.useFakeTimers();
-  state.syncGet.mockResolvedValue({ 'mrclippy:settings': { disabledHosts: [location.hostname] } });
-  await import('../src/content/index');
-  await vi.advanceTimersByTimeAsync(1);
-  expect(document.querySelector('#mrclippy-host')).toBeNull();
-  for (const off of [{ disabledHosts: [location.hostname] }, { enabled: false }]) {
-    changeSettings({ enabled: true, disabledHosts: [] });
-    await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')).not.toBeNull());
-    const previous = document.querySelector('#mrclippy-host')!;
-    changeSettings(off);
-    expect(previous.isConnected).toBe(false);
-    expect(state.watchers.size).toBe(1);
-  }
-  changeSettings({ enabled: true, disabledHosts: [] });
-  await vi.waitFor(() => expect(document.querySelectorAll('#mrclippy-host')).toHaveLength(1));
-  expect(state.addListener).toHaveBeenCalledTimes(1);
-  expect(state.removeListener).not.toHaveBeenCalled();
-  expect(state.sourceDispose).toHaveBeenCalledTimes(2);
-});
-
-it('discards superseded asynchronous startups during rapid master toggles', async () => {
-  vi.useFakeTimers();
-  let finishOld!: (pack: typeof testPack) => void;
-  let finishNew!: (pack: typeof testPack) => void;
-  state.loadPack.mockImplementationOnce(() => new Promise((r) => { finishOld = r; }))
-    .mockImplementationOnce(() => new Promise((r) => { finishNew = r; }));
-  await import('../src/content/index');
-  await vi.waitFor(() => expect(state.loadPack).toHaveBeenCalledTimes(1));
-  changeSettings({ enabled: false });
-  changeSettings({ enabled: true });
-  await vi.waitFor(() => expect(state.loadPack).toHaveBeenCalledTimes(2));
-  finishNew(testPack);
-  await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')).not.toBeNull());
-  const current = document.querySelector('#mrclippy-host');
-  finishOld(testPack);
-  await vi.advanceTimersByTimeAsync(1);
-  expect(document.querySelector('#mrclippy-host')).toBe(current);
-  expect(document.querySelectorAll('#mrclippy-host')).toHaveLength(1);
-  expect(state.addListener).toHaveBeenCalledTimes(1);
-  expect(state.sourceDispose).not.toHaveBeenCalled();
-});
-
 it('finally disposes the page owner while startup is still pending', async () => {
   vi.useFakeTimers();
   let finish!: (pack: typeof testPack) => void;
@@ -148,7 +95,7 @@ it('finally disposes the page owner while startup is still pending', async () =>
   window.dispatchEvent(new Event('pagehide'));
   expect(state.watchers.size).toBe(0);
   expect(state.removeListener).toHaveBeenCalledExactlyOnceWith(staleMessage);
-  staleWatcher({ 'mrclippy:settings': { newValue: { enabled: true } } }, 'sync');
+  staleWatcher({ 'mrclippy:settings': { newValue: { muted: false } } }, 'sync');
   staleMessage({ type: 'mrclippy:toggle' });
   finish(testPack);
   await vi.advanceTimersByTimeAsync(1);
@@ -164,27 +111,13 @@ it('finally disposes a mounted runtime and never restarts it on page events', as
   window.dispatchEvent(new Event('pagehide'));
   window.dispatchEvent(new Event('pagehide'));
   window.dispatchEvent(new Event('popstate'));
-  changeSettings({ enabled: true });
+  changeSettings({ muted: false });
   await vi.advanceTimersByTimeAsync(1);
   expect(document.querySelector('#mrclippy-host')).toBeNull();
   expect(state.sourceDispose).toHaveBeenCalledTimes(1);
   expect(state.removeListener).toHaveBeenCalledTimes(1);
   expect(state.watchers.size).toBe(0);
   expect(vi.getTimerCount()).toBe(0);
-});
-
-it('ignores an old initial preference read after a newer settings event', async () => {
-  vi.useFakeTimers();
-  let finish!: (value: object) => void;
-  state.syncGet.mockImplementationOnce(() => new Promise((r) => { finish = r; }));
-  await import('../src/content/index');
-  expect(state.watchers.size).toBe(1);
-  changeSettings({ enabled: false });
-  finish({ 'mrclippy:settings': { enabled: true } });
-  await vi.advanceTimersByTimeAsync(1);
-  expect(state.loadPack).not.toHaveBeenCalled();
-  changeSettings({ enabled: true });
-  await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')).not.toBeNull());
 });
 
 it('restarts an asynchronous startup against the new URL without mounting the old document', async () => {
@@ -206,7 +139,7 @@ it('restarts an asynchronous startup against the new URL without mounting the ol
   } finally { history.replaceState(null, '', oldUrl); }
 });
 
-it('keeps close-X hidden when its snooze update and unrelated settings arrive', async () => {
+it('keeps close-X hidden when unrelated settings arrive, and writes no snooze', async () => {
   vi.useFakeTimers();
   state.sendMessage.mockImplementation(async (message) => {
     if (message.type !== 'mrclippy:settings') return { hasKey: true };
@@ -220,11 +153,9 @@ it('keeps close-X hidden when its snooze update and unrelated settings arrive', 
   host.shadowRoot!.querySelector<HTMLButtonElement>('.mrclippy-agent-close')!.click();
   await vi.advanceTimersByTimeAsync(1);
   expect(agent.hidden).toBe(true);
-  const mutation = state.sendMessage.mock.calls.find(([m]) => m.type === 'mrclippy:settings')![0].mutation;
-  // Quiet for exactly as long as he is gone: he comes back in 5 minutes.
-  expect(mutation.patch.snoozeUntil).toBeGreaterThan(Date.now() + 4 * 60_000);
-  expect(mutation.patch.snoozeUntil).toBeLessThanOrEqual(Date.now() + 5 * 60_000);
-  changeSettings({ muted: true, snoozeUntil: mutation.patch.snoozeUntil });
+  // Away is not a snooze: Settings must not say "Snoozed" for a click on X.
+  expect(state.sendMessage.mock.calls.some(([m]) => m.type === 'mrclippy:settings')).toBe(false);
+  changeSettings({ muted: true });
   await vi.advanceTimersByTimeAsync(10000);
   expect(document.querySelector('#mrclippy-host')).toBe(host);
   expect(agent.hidden).toBe(true);
@@ -257,7 +188,7 @@ it('invalidates pending startup while frozen and starts fresh after restoration'
   await vi.waitFor(() => expect(state.loadPack).toHaveBeenCalledTimes(1));
   window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
   finishOld(testPack);
-  changeSettings({ enabled: true });
+  changeSettings({ muted: false });
   state.addListener.mock.calls[0]![0]({ type: 'mrclippy:toggle' });
   await vi.advanceTimersByTimeAsync(1);
   expect(document.querySelector('#mrclippy-host')).toBeNull();
@@ -268,81 +199,6 @@ it('invalidates pending startup while frozen and starts fresh after restoration'
   finishNew(testPack);
   await vi.waitFor(() => expect(document.querySelectorAll('#mrclippy-host')).toHaveLength(1));
   expect(state.syncGet).toHaveBeenCalledTimes(2);
-});
-
-it('rereads disabled and host-blocked preferences before restoring a runtime', async () => {
-  vi.useFakeTimers();
-  await import('../src/content/index');
-  await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')).not.toBeNull());
-  for (const blocked of [{ enabled: false }, { disabledHosts: [location.hostname] }]) {
-    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
-    state.syncGet.mockResolvedValue({ 'mrclippy:settings': blocked });
-    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-    await vi.advanceTimersByTimeAsync(1);
-    expect(document.querySelector('#mrclippy-host')).toBeNull();
-    changeSettings({ enabled: true, disabledHosts: [] });
-    await vi.waitFor(() => expect(document.querySelectorAll('#mrclippy-host')).toHaveLength(1));
-  }
-  expect(state.syncGet).toHaveBeenCalledTimes(3);
-  expect(state.addListener).toHaveBeenCalledTimes(1);
-});
-
-it('discards an initial settings read that completes after a BFCache restore begins', async () => {
-  vi.useFakeTimers();
-  let finishInitial!: (settings: object) => void;
-  let finishRestore!: (settings: object) => void;
-  state.syncGet.mockImplementationOnce(() => new Promise((r) => { finishInitial = r; }))
-    .mockImplementationOnce(() => new Promise((r) => { finishRestore = r; }));
-  await import('../src/content/index');
-  window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
-  window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-  finishInitial({ 'mrclippy:settings': { enabled: true } });
-  await vi.advanceTimersByTimeAsync(1);
-  expect(state.loadPack).not.toHaveBeenCalled();
-  finishRestore({ 'mrclippy:settings': { enabled: false } });
-  await vi.advanceTimersByTimeAsync(1);
-  expect(state.loadPack).not.toHaveBeenCalled();
-  expect(document.querySelector('#mrclippy-host')).toBeNull();
-});
-
-it('ignores out-of-order restore reads across repeated cache cycles', async () => {
-  vi.useFakeTimers();
-  await import('../src/content/index');
-  await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')).not.toBeNull());
-  let first!: (settings: object) => void;
-  let second!: (settings: object) => void;
-  state.syncGet.mockImplementationOnce(() => new Promise((r) => { first = r; }))
-    .mockImplementationOnce(() => new Promise((r) => { second = r; }));
-  for (let cycle = 0; cycle < 2; cycle++) {
-    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
-    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-  }
-  expect(state.syncGet).toHaveBeenCalledTimes(3);
-  second({ 'mrclippy:settings': { enabled: false } });
-  first({ 'mrclippy:settings': { enabled: true } });
-  await vi.advanceTimersByTimeAsync(1);
-  expect(document.querySelector('#mrclippy-host')).toBeNull();
-  changeSettings({ enabled: true });
-  await vi.waitFor(() => expect(document.querySelectorAll('#mrclippy-host')).toHaveLength(1));
-  expect(state.loadPack).toHaveBeenCalledTimes(2);
-  expect(state.addListener).toHaveBeenCalledTimes(1);
-  expect(state.watchers.size).toBe(1);
-});
-
-it('lets a newer settings event supersede a pending restore read', async () => {
-  vi.useFakeTimers();
-  await import('../src/content/index');
-  await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')).not.toBeNull());
-  let finish!: (settings: object) => void;
-  state.syncGet.mockImplementationOnce(() => new Promise((r) => { finish = r; }));
-  window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
-  window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-  changeSettings({ disabledHosts: [location.hostname] });
-  finish({ 'mrclippy:settings': { enabled: true, disabledHosts: [] } });
-  await vi.advanceTimersByTimeAsync(1);
-  expect(document.querySelector('#mrclippy-host')).toBeNull();
-  expect(state.loadPack).toHaveBeenCalledTimes(1);
 });
 
 it('removes restore listeners at final disposal and cannot revive from late reads or events', async () => {
@@ -363,7 +219,7 @@ it('removes restore listeners at final disposal and cannot revive from late read
     window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
     window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
     window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
-    finish({ 'mrclippy:settings': { enabled: true } });
+    finish({ 'mrclippy:settings': { muted: false } });
     await vi.advanceTimersByTimeAsync(1);
     expect(document.querySelector('#mrclippy-host')).toBeNull();
     expect(state.loadPack).toHaveBeenCalledTimes(3);
@@ -378,7 +234,7 @@ it('removes restore listeners at final disposal and cannot revive from late read
   } finally { add.mockRestore(); remove.mockRestore(); }
 });
 
-it('restores close-X as hidden without a greeting or renewed snooze writes', async () => {
+it('restores close-X as hidden without a greeting or any settings write', async () => {
   vi.useFakeTimers();
   let saved: Record<string, unknown> = {};
   state.sendMessage.mockImplementation(async (message) => {
@@ -392,7 +248,6 @@ it('restores close-X as hidden without a greeting or renewed snooze writes', asy
   await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')).not.toBeNull());
   document.querySelector('#mrclippy-host')!.shadowRoot!.querySelector<HTMLButtonElement>('.mrclippy-agent-close')!.click();
   await vi.advanceTimersByTimeAsync(1);
-  const originalSnooze = saved.snoozeUntil;
   for (let cycle = 0; cycle < 2; cycle++) {
     window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
     window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
@@ -401,8 +256,8 @@ it('restores close-X as hidden without a greeting or renewed snooze writes', asy
     expect(root.querySelector<HTMLElement>('.mrclippy-agent')!.hidden).toBe(true);
     expect(root.querySelector<HTMLElement>('.mrclippy-balloon')!.hidden).toBe(true);
   }
-  expect(saved.snoozeUntil).toBe(originalSnooze);
-  expect(state.sendMessage.mock.calls.filter(([m]) => m.type === 'mrclippy:settings')).toHaveLength(1);
+  expect(saved.snoozeUntil).toBeUndefined();
+  expect(state.sendMessage.mock.calls.filter(([m]) => m.type === 'mrclippy:settings')).toHaveLength(0);
 });
 
 it('preserves shortcut-hidden intent across restore and still allows an explicit show', async () => {

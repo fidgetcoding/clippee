@@ -4,6 +4,12 @@ import { ext } from '../platform';
 /** After X, he comes back on his own. Nate: "he should always reappear again after a certain amount of time". */
 export const RETURN_AFTER_MS = 5 * 60_000;
 
+/**
+ * Longer than any entrance or exit takes. A request that finds one still
+ * running after this long treats it as stuck and starts clean.
+ */
+export const STUCK_AFTER_MS = 12_000;
+
 /** The first Greeting frame after he has drawn himself in from a bare wire: the hop and the wave. */
 export const GREETING_WAVE_FRAME = 22;
 
@@ -18,7 +24,11 @@ export function prefersReducedMotion(): boolean {
 
 /** Tell the worker, which keeps the toolbar button in step with him on this tab. */
 export function reportAway(away: boolean): void {
-  void ext.runtime.sendMessage({ type: 'mrclippy:away', away }).catch(() => undefined);
+  try {
+    void ext.runtime.sendMessage({ type: 'mrclippy:away', away }).catch(() => undefined);
+  } catch {
+    // The extension was reloaded under this page; the new copy reports for itself.
+  }
 }
 
 /** His return waits until someone can see it: this tab visible and focused. */
@@ -74,9 +84,10 @@ export interface PresenceOptions {
   readonly ready?: () => boolean;
   readonly watchReady?: (changed: () => void) => () => void;
   readonly returnAfterMs?: number;
+  readonly now?: () => number;
 }
 
-type Where = 'present' | 'away';
+export type Where = 'present' | 'away';
 
 /**
  * Where he is, and how he gets there. Every arrival is a random entrance and
@@ -91,6 +102,9 @@ export class Presence {
   private where: Where = 'away';
   private wanted: Where = 'away';
   private busy = false;
+  private busySince = 0;
+  /** Bumped by `force`, so an effect still running from before can never land. */
+  private generation = 0;
   private arrivedOnce = false;
   private disposed = false;
   private returnTimer: ReturnType<typeof setTimeout> | undefined;
@@ -108,14 +122,47 @@ export class Presence {
   arrive(): void {
     this.clearReturn();
     this.want('present');
-    this.run();
+    if (this.stuck()) this.force('present');
+    else this.run();
   }
 
   /** Leave, and come back on his own after a while. */
   leave(): void {
     this.want('away');
+    if (this.stuck()) {
+      this.force('away');
+      return;
+    }
     this.scheduleReturn();
     this.run();
+  }
+
+  /**
+   * Settings' Show and Hide: put him there now, whatever state he got into.
+   * Any effect is cut off and can never land, the busy flag and his queue are
+   * cleared, and he is at rest on his spot or gone. No effect plays: this is
+   * the button that has to work.
+   */
+  force(where: Where): void {
+    if (this.disposed) return;
+    this.generation++;
+    this.busy = false;
+    this.options.player.cancel();
+    this.clearReturn();
+    this.options.agent.hide(true);
+    this.where = where;
+    this.want(where, true);
+    if (where === 'away') {
+      this.scheduleReturn();
+      return;
+    }
+    this.options.agent.show(false);
+    this.arrivedOnce = true;
+    this.options.onArrived?.(true, true);
+  }
+
+  private stuck(): boolean {
+    return this.busy && (this.options.now ?? Date.now)() - this.busySince > STUCK_AFTER_MS;
   }
 
   /** Away already (restored from the back/forward cache hidden); still comes back. */
@@ -188,7 +235,10 @@ export class Presence {
         continue;
       }
       this.busy = true;
-      void this.animate(target).finally(() => {
+      this.busySince = (this.options.now ?? Date.now)();
+      const generation = this.generation;
+      void this.animate(target, generation).finally(() => {
+        if (generation !== this.generation) return;
         this.busy = false;
         this.run();
       });
@@ -200,7 +250,7 @@ export class Presence {
     return this.options.reducedMotion() || !this.options.player.supported;
   }
 
-  private async animate(target: Where): Promise<void> {
+  private async animate(target: Where, generation: number): Promise<void> {
     const kind: FxKind = target === 'present' ? 'appear' : 'disappear';
     const anchor = { ...this.options.agent.spot };
     // He is drawn on the overlay for the whole effect; his sprite stays out of the way.
@@ -213,7 +263,7 @@ export class Presence {
     } catch {
       // No effect this time. He still goes where he was going.
     }
-    if (!this.disposed) this.land(target, false);
+    if (!this.disposed && generation === this.generation) this.land(target, false);
   }
 
   /**
