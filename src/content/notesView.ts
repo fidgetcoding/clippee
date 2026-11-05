@@ -102,9 +102,22 @@ export class NotesView {
     this.refresh();
   }
 
+  /** In place of Fix all when there is no API key: one line and one button. */
+  askForKey(openSettings: () => void): void {
+    const line = document.createElement('div');
+    line.className = 'mrclippy-fixall mrclippy-needkey';
+    const go = button('Open Settings', 'mrclippy-btn-primary');
+    go.addEventListener('click', () => openSettings());
+    const hint = document.createElement('span');
+    hint.className = 'mrclippy-fixall-hint';
+    hint.textContent = 'Paste your Claude API key in Settings and I\u2019ll write a fix for each note.';
+    line.append(go, hint);
+    this.el.insertBefore(line, this.groups);
+  }
+
   /** Fix all sits between the heading and the list. */
   setFixAll(bar?: HTMLElement): void {
-    this.el.querySelector('.mrclippy-fixall')?.remove();
+    this.el.querySelector('.mrclippy-fixall:not(.mrclippy-needkey)')?.remove();
     if (bar) this.el.insertBefore(bar, this.groups);
   }
 

@@ -125,6 +125,34 @@ describe('tally line', () => {
     expect(tallyLine([undefined])).toBe('');
   });
 
+  it('without a key, drafts nothing and asks once for Settings', () => {
+    // From a live doc: no key meant five failed drafts, five red errors and
+    // a Settings window per failure.
+    const onAsk = vi.fn(async () => ({ text: 'never' }));
+    const onSettings = vi.fn();
+    const p = panel({
+      findings: [
+        { text: 'A', anchor: 'one' },
+        { text: 'B', anchor: 'two' },
+      ],
+      canEdit: true,
+      prefetch: false,
+      needsKey: true,
+      onAsk,
+      onSettings,
+    });
+    expect(onAsk).not.toHaveBeenCalled();
+    expect(p.el.querySelectorAll('.mrclippy-review:not([hidden]), .mrclippy-fix-apply:not([hidden])')).toHaveLength(0);
+    expect(p.el.querySelector('.mrclippy-needkey')?.textContent).toContain('Paste your Claude API key in Settings');
+
+    p.el.querySelector<HTMLButtonElement>('.mrclippy-dismiss')!.click();
+    expect(p.el.querySelector('.mrclippy-needkey')).not.toBeNull();
+
+    p.el.querySelector<HTMLButtonElement>('.mrclippy-needkey button')!.click();
+    expect(onSettings).toHaveBeenCalledTimes(1);
+    p.dispose();
+  });
+
   it('shows notes still in line as Waiting, not as a ready fix', () => {
     // From a live doc: queued notes showed the "fix ready" bulb, a blank
     // status and a lone Review button, which read as broken.

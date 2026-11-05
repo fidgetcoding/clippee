@@ -226,7 +226,7 @@ export class ChatPanel {
       ? fixAllBar([...fixable.values()], (changes) => this.showFixAll(changes)) : undefined);
 
     findings.forEach((finding, index) => {
-      const canFix = finding.anchor !== undefined && this.options.canEdit !== false;
+      const canFix = finding.anchor !== undefined && this.options.canEdit !== false && !this.options.needsKey;
       let ensure: (() => { thread: Thread; started: Promise<void> | undefined }) | undefined;
       const row = this.notes.addNote(finding, {
         dismiss: () => {
@@ -262,6 +262,7 @@ export class ChatPanel {
     });
 
     refreshFixAll();
+    if (this.options.needsKey && findings.length > 0) this.notes.askForKey(this.options.onSettings);
     if (prefetch.length > 0) this.prefetchFixes(prefetch);
   }
 

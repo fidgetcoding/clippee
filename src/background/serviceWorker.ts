@@ -103,13 +103,28 @@ async function runAudit(request: AuditRequest): Promise<AuditResponse> {
  * in a small window of its own. Either way the key is typed into an extension
  * page, never into the document's DOM.
  */
-async function openSettings(fromUrl?: string): Promise<void> {
+let opening: Promise<void> | undefined;
+
+/**
+ * One Settings at a time. Five fixes failing for want of a key used to ask
+ * five times at once: one toolbar popup and four stacked windows.
+ */
+function openSettings(fromUrl?: string): Promise<void> {
+  opening ??= openSettingsOnce(fromUrl).finally(() => {
+    opening = undefined;
+  });
+  return opening;
+}
+
+async function openSettingsOnce(fromUrl?: string): Promise<void> {
+  if (await focusOpenSettings()) return;
   try {
     await ext.action.openPopup();
     return;
   } catch {
     // Fall through to a window.
   }
+  if (await focusOpenSettings()) return;
   let host = '';
   try {
     host = fromUrl ? new URL(fromUrl).hostname : '';
@@ -118,6 +133,20 @@ async function openSettings(fromUrl?: string): Promise<void> {
   }
   const url = ext.runtime.getURL(`src/popup/index.html?host=${encodeURIComponent(host)}`);
   await ext.windows.create({ url, type: 'popup', width: 380, height: 640, focused: true });
+}
+
+/** Bring an already open Settings window forward. True when there was one. */
+async function focusOpenSettings(): Promise<boolean> {
+  try {
+    const page = ext.runtime.getURL('src/popup/index.html');
+    const windows = await ext.windows.getAll({ populate: true, windowTypes: ['popup'] });
+    const open = windows.find((w) => w.tabs?.some((t) => t.url?.startsWith(page)));
+    if (open?.id === undefined) return false;
+    await ext.windows.update(open.id, { focused: true });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isType(value: unknown, type: string): boolean {

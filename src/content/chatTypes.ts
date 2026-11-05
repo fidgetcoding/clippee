@@ -53,6 +53,8 @@ export interface ChatPanelOptions {
   readonly onLocate?: (passage: string) => void;
   /** Draft every fix as soon as the panel opens, so Apply is one click. */
   readonly prefetch?: boolean;
+  /** No API key yet: list the notes, offer Settings once, draft nothing. */
+  readonly needsKey?: boolean;
   readonly onDismissFinding: (index: number) => void;
   /** Escape. There is no close button: clicking him closes it too. */
   readonly onClose: () => void;

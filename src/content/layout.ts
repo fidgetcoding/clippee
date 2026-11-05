@@ -82,6 +82,9 @@ export function makePanelMovable(
     typeof ResizeObserver === 'undefined'
       ? undefined
       : new ResizeObserver(() => {
+          // Notes and drafts fill in after it opens; a panel placed at its
+          // first height grew past the bottom of the window. Place it again.
+          balloon.position();
           if (timer !== undefined) clearTimeout(timer);
           timer = setTimeout(() => {
             const rect = el.getBoundingClientRect();

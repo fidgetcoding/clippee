@@ -39,8 +39,14 @@ const DEBUG_SILENCE_MS = 3_000;
  * `agent.play()` for a suggestion — the only direct calls are the greeting and
  * an explicit click, both of which the user initiated.
  */
-/** Ask the background to open Settings. It owns the window; we only ask. */
+/**
+ * Ask the background to open Settings. It owns the window; we only ask, and
+ * only once per few seconds: several fixes failing together is one problem.
+ */
+let lastSettingsAsk = 0;
 function openSettings(): void {
+  if (Date.now() - lastSettingsAsk < 5_000) return;
+  lastSettingsAsk = Date.now();
   void ext.runtime.sendMessage({ type: 'mrclippy:open-settings' }).catch(() => undefined);
 }
 
@@ -158,6 +164,8 @@ async function mountRuntime(
   }
 
   let panel: ChatPanel | undefined;
+  /** The open panel was built without a key, so it drafts nothing yet. */
+  let panelNeedsKey = false;
 
   const editHistory = new EditHistory(source);
 
@@ -279,7 +287,7 @@ async function mountRuntime(
     void agent.play('CheckingSomething');
 
     void (async () => {
-      const [text, savedLayout] = await Promise.all([source.read(), loadLayout()]);
+      const [text, savedLayout, hasKey] = await Promise.all([source.read(), loadLayout(), hasApiKey()]);
       if (disposed || generation !== panelGeneration) return;
       if (context !== source.context?.()) throw new Error('The active editor changed.');
 
@@ -303,7 +311,9 @@ async function mountRuntime(
         })),
         ...(docTitle ? { docTitle } : {}),
         canEdit: source.canEdit(),
-        prefetch: source.canEdit(),
+        // Without a key every draft would fail; say so once instead.
+        prefetch: source.canEdit() && hasKey,
+        needsKey: !hasKey,
         onAsk: (question, history) => context === source.context?.()
           ? askAgent(question, history)
           : Promise.reject(new Error('The active editor changed. Reopen the panel.')),
@@ -333,6 +343,7 @@ async function mountRuntime(
         onSettings: openSettings,
       });
 
+      panelNeedsKey = !hasKey;
       agent.balloon.render(panel.el);
       releasePanel?.();
       releasePanel = makePanelMovable(agent.balloon, panel.handle, savedLayout.panel);
@@ -347,6 +358,7 @@ async function mountRuntime(
 
   function closePanel(): void {
     panelGeneration++;
+    panelNeedsKey = false;
     panel?.dispose();
     highlighter.clear();
     releasePanel?.();
@@ -399,6 +411,18 @@ async function mountRuntime(
     }, KEY_PROMPT_DELAY_MS);
   });
 
+  // Settings is another window. Coming back from it with a key pasted, the
+  // open panel starts over and drafts every fix, with no second click.
+  const onFocus = (): void => {
+    if (!panel || !panelNeedsKey) return;
+    void hasApiKey().then((hasKey) => {
+      if (!hasKey || disposed || !panel || !panelNeedsKey) return;
+      closePanel();
+      openPanel();
+    });
+  };
+  window.addEventListener('focus', onFocus);
+
   const onMessage = (message: unknown): void => {
     if (!message || typeof message !== 'object') return;
     const type = (message as { type?: unknown }).type;
@@ -417,6 +441,7 @@ async function mountRuntime(
   function teardown(): void {
     if (disposed) return;
     disposed = true;
+    window.removeEventListener('focus', onFocus);
     closePanel();
     if (keyPromptTimer !== undefined) clearTimeout(keyPromptTimer);
     drafts.clear();

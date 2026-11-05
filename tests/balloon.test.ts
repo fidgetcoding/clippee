@@ -143,3 +143,19 @@ describe('suggestion buttons', () => {
     expect(balloon.visible).toBe(true);
   });
 });
+
+describe('balloon placement', () => {
+  it('keeps a moved panel fully on screen, not just its title bar', () => {
+    // From a live doc: the panel opened low and its Ask box ran past the
+    // bottom of the window.
+    const balloon = make();
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+    Object.defineProperty(window, 'innerWidth', { value: 1200, configurable: true });
+    balloon.el.getBoundingClientRect = () =>
+      ({ top: 0, left: 0, right: 400, bottom: 600, width: 400, height: 600, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+
+    balloon.pin(700, 500);
+
+    expect(balloon.el.style.top).toBe('200px');
+  });
+});

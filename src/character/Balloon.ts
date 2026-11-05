@@ -256,7 +256,8 @@ export class Balloon {
     if (this.pinned) {
       const b = this.el.getBoundingClientRect();
       const left = Math.min(Math.max(0, this.pinned.left), Math.max(0, window.innerWidth - b.width));
-      const top = Math.min(Math.max(0, this.pinned.top), Math.max(0, window.innerHeight - 40));
+      // The whole sheet stays on screen, not just its title bar.
+      const top = Math.min(Math.max(0, this.pinned.top), Math.max(0, window.innerHeight - b.height));
       this.el.style.left = `${left}px`;
       this.el.style.top = `${top}px`;
       return;
