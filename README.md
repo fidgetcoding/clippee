@@ -108,7 +108,9 @@ Then hit the reload arrow on his card at `chrome://extensions` and reload your D
 
 His first real catch was in a comic script of mine: “the same man the reader met on p12,” written twice. He was right. I was annoyed.
 
-**He has the fix ready.** When you open the panel he starts writing a fix for every note in the background, a few at a time, so most rows already have Apply waiting. Each fix is a before and after with only the changed words marked. Apply it or skip it. An applied fix gets Undo, and Undo turns into Redo. **Fix all** does the whole list, with one Undo for the set.
+**He has the fix ready.** When you open the panel he starts writing a fix for every note in the background, a few at a time, so most rows already have Apply waiting. Each fix is a before and after with only the changed words marked. Apply it or skip it. An applied fix gets Undo, right there on its row in the list, and Undo turns into Redo. **Fix all** does the whole list, with one Undo for the set.
+
+**He keeps receipts.** Every change he makes to a doc goes in its **History**, newest first, and it's still there after you reload. Undo one, or Undo all. If you've rewritten that sentence since, he says so and keeps his hands off it.
 
 **You can talk to him on every screen.** The Ask box sits at the bottom of every view. Ask about a fix, ask him to change something, or tell him what to do with the panel. “hide applied”, “undo all”, “go back” and “snooze 1h” run instantly on your machine with no call to Claude, and “hid applied” still works. Anything looser goes to Claude with a snapshot of the panel. He presses the same buttons you would, then tells you in one line what he did.
 
@@ -116,7 +118,7 @@ His first real catch was in a comic script of mine: “the same man the reader m
 
 **He checks your structure when you ask.** Type “check my structure” and he looks for things your intro promises that the rest of the doc never delivers.
 
-**He never just fades in.** He gets printed out on a dot matrix printer. He installs himself with a setup wizard. He punches through a blue screen, drills up through your page, or gets beamed down by a teleporter. Eleven ways in, eight ways out, shuffled so you won't see a repeat until he's done them all. Click his X and he leaves in style, then comes back on his own 5 minutes later, because that's who he is. Miss him sooner? Click the toolbar button. If your computer is set to reduce motion, he just walks on and off like a normal paperclip.
+**He never just fades in.** He gets printed out on a dot matrix printer. He installs himself with a setup wizard. He punches through a blue screen, drills up through your page, or gets beamed down by a teleporter. Eleven ways in, eight ways out, shuffled so you won't see a repeat until he's done them all. Click his X and he leaves in style, then comes back on his own 5 minutes later, because that's who he is. Miss him sooner? Click the toolbar button. While he's away it just calls him back, so Settings never drops on top of his entrance. Right click it and pick Options when you want Settings. If your computer is set to reduce motion, he just walks on and off like a normal paperclip.
 
 **He looks the part.** A cream speech balloon with an indigo ribbon, beveled buttons, Tahoma and etched group boxes, all a few shades off the Windows 98 originals. He stands on his own next to the panel, never boxed inside it.
 
@@ -133,7 +135,7 @@ His first real catch was in a comic script of mine: “the same man the reader m
 
 ```bash
 npm run dev            # watch mode
-npm test               # 311 tests across 35 files
+npm test               # 332 tests across 37 files
 npm run typecheck
 npm run build          # Chromium build into dist/
 npm run build:firefox  # Firefox build into dist-firefox/

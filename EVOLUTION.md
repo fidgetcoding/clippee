@@ -6,7 +6,7 @@ My words are quoted as I wrote them, typos fixed, nothing else. Commit hashes ar
 
 I wrote the idea down on August 27, 2026, researched it in 11 lanes, specced it in 21 decisions, and had a working Chrome and Firefox extension at 126 passing tests the next day. Then it sat on my machine, uncommitted, for two months.
 
-The real build happened November 2 to 5. In four days he learned to edit Google Docs, show every fix as a preview, write fixes before you ask and run his own panel from plain words. His panel came out of a design lab that opened with 54 options. He was called Mr. Clippy for most of that. On November 5 he became Clippee by Microshaft, with a logo, a palette and art of his own, and that night he became v2: entrances, exits, and more jumping. The repo went from 126 tests to 311.
+The real build happened November 2 to 5. In four days he learned to edit Google Docs, show every fix as a preview, write fixes before you ask and run his own panel from plain words. His panel came out of a design lab that opened with 54 options. He was called Mr. Clippy for most of that. On November 5 he became Clippee by Microshaft, with a logo, a palette and art of his own, and that night he became v2: entrances, exits, and more jumping. Then v2.1: a History and Undo on every fixed row. The repo went from 126 tests to 332.
 
 ## 2. Origin, in my words
 
@@ -54,6 +54,7 @@ Then I asked for the README you're probably reading next to this:
 | Nov 5 | Clippee's own art: 18 animations redrawn on the 1997 timings, Microsoft's pack removed, Thinking while fixes draft. 285 tests | `9d0d335` |
 | Nov 5 | Tagged v1 | `v1` |
 | Nov 5 | v2: random entrances and exits, he comes back after 5 minutes, hops, Victory, a waddle, the mark in the title bar. 311 tests | `v2` |
+| Nov 5 | v2.1: Undo on each fixed row, a History per doc, the toolbar button calls him back while he's away, the full name in the title bar. 332 tests | `v2.1` |
 
 ## 4. Round by round
 
@@ -154,6 +155,17 @@ I opened it on a real doc:
 - **Built, logo in context:** the Microshaft mark now sits left of "Clippee" in the panel's title bar and in Settings, like the logo lab showed it.
 - **Tested:** 311 tests, including the pools, the bag never repeating back to back, the 5 minute return, the toolbar summon, the reduced motion path and the new animations pinned by pixel hash. The built extension ran in a clean Chromium against a stand-in Docs page.
 
+### Round 12: v2.1 (November 5)
+
+My verdict on v2, minus one word: "This is literally PERFECT." Then a few things I wanted.
+
+- **Asked, undo:** "We need an edit history archive type button, so you can go and undo stuff. Or maybe when you unhide fixed there's an undo near them." Which one? "Why not both!"
+- **Built, Undo on the row:** a fixed note in the list gets Undo where Review was, through the same path as the fix's own Undo, and it flips to Redo. The row says Undone while it's out.
+- **Built, History:** a History button next to Settings opens every change he's made to this doc, newest first: the before and after, which note or question it came from, and when. Undo or Redo on each one, Undo all and Redo all at the top, and Clear history. It's kept per doc on this computer, so it survives a reload, and it's never synced or sent anywhere. Undo only goes through if the text he wrote is still there with the same words around it. If you've changed it since, it says "Changed since. Can't undo safely." and leaves your doc alone. The chat knows it too: "show history", "undo the last fix", "undo all".
+- **Asked, the popup:** "Can we reorient this panel somehow. It often conflicts with Clippee's animations that bring him in." Chrome pins that popup under the icon, so it can't move. It gets out of the way instead: while he's away on a tab, the toolbar button has no popup there, and a click just brings him back. Settings is still a right click away under Options. And if his 5 minutes run out while you're in another tab or app, he waits for you to come back before he makes his entrance.
+- **Asked, the name:** "Need to say Clippee by Microshaft." The title bar and Settings now say the whole thing.
+- **Tested:** 332 tests, including Undo and Redo on a row, the History recording fixes, Fix all and chat edits, the History surviving a remount, the cap and Clear, refusing an undo over changed text, the chat commands, the button per tab and the return that waits for you. The built extension ran on a stand-in Docs page that really takes edits.
+
 ## 5. Feature family tree
 
 ```
@@ -171,6 +183,7 @@ I opened it on a real doc:
    └─ rename → Microshaft logo lab → Warmer palette → recolored logo → icon
       └─ his own art → Thinking while fixes draft
          └─ v2: random entrances and exits → back in 5 min → hops, Victory, waddle
+            └─ v2.1: Undo on the row → History per doc → the button calls him back
 ```
 
 ## 6. Test log
@@ -193,6 +206,7 @@ I opened it on a real doc:
 | Nov 5 | `tests/size.bench.test.ts`, same run | 64 ms at 11,040 words | Local run |
 | Nov 5 | My run again, at `9d0d335` after the new art | 285 of 285 across 34 files, types, both builds; bench 48 ms | Local run |
 | Nov 5 | v2: tests, types, build; built extension in clean Chromium; entrances and exits against the lab | 311 of 311 across 35 files; 504 of 504 frames identical to the lab | `v2`, local run |
+| Nov 5 | v2.1: tests, types, both builds; built extension on a stand-in Docs page that takes edits | 332 of 332 across 37 files; apply, row Undo and Redo, History across a reload, the button while he's away | `v2.1`, local run |
 
 There's no CI on this repo yet. Every number above comes from a run on my machine. The fake Docs in the tests is shaped like the live API, and the real Docs gets checked by hand.
 
