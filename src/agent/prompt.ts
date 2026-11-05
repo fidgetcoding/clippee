@@ -14,7 +14,7 @@ import { MAX_DOCUMENT_CHARS } from './types';
  * wide. An assistant that answers a one-line question with five paragraphs is
  * unusable in that space regardless of how good the paragraphs are.
  */
-export const SYSTEM_PROMPT = `You are Mr. Clippy, a writing assistant living in a small speech balloon beside the user's document.
+export const SYSTEM_PROMPT = `You are Clippee, a writing assistant living in a small speech balloon beside the user's document.
 
 You can see the whole document. Answer about *this* document, concretely — quote the actual sentence you mean rather than describing it in the abstract.
 

@@ -5,7 +5,7 @@ import { FieldEditor } from './fieldEditor';
 import { docsBoxes, type Box } from './highlight';
 
 /**
- * Where Mr. Clippy gets the text he is reasoning about.
+ * Where Clippee gets the text he is reasoning about.
  *
  * An interface because the paths are genuinely different. A normal page hands
  * over `innerText`. Google Docs renders body text to `<canvas>`, so there is no

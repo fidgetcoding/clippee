@@ -5,7 +5,7 @@ import type { EditOutcome } from '../docs/protocol';
  * Editing outside Google Docs: the text box you were last typing in.
  *
  * Tracked on `focusin` rather than read from `document.activeElement` at ask
- * time, because by then focus has moved into Mr. Clippy's own chat box. Events
+ * time, because by then focus has moved into Clippee's own chat box. Events
  * from inside his shadow root retarget to the host element, which is ignored.
  */
 

@@ -52,7 +52,7 @@ export class Agent {
     this.root.className = 'mrclippy-agent';
     this.root.setAttribute('role', 'button');
     this.root.setAttribute('tabindex', '0');
-    this.root.setAttribute('aria-label', 'Mr. Clippy');
+    this.root.setAttribute('aria-label', 'Clippee');
     this.root.hidden = true;
 
     this.sprite = document.createElement('div');
@@ -65,8 +65,8 @@ export class Agent {
       const close = document.createElement('button');
       close.type = 'button';
       close.className = 'mrclippy-agent-close';
-      close.title = 'Send Mr. Clippy away';
-      close.setAttribute('aria-label', 'Send Mr. Clippy away');
+      close.title = 'Send Clippee away';
+      close.setAttribute('aria-label', 'Send Clippee away');
       close.textContent = '\u2715';
       close.addEventListener('pointerdown', (e) => e.stopPropagation());
       close.addEventListener('click', (e) => {

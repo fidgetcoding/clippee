@@ -153,7 +153,7 @@ export class Balloon {
   suggest(
     text: string,
     actions: readonly BalloonAction[],
-    title = 'Mr. Clippy suggests',
+    title = 'Clippee suggests',
   ): void {
     if (this.locked) return;
     const ribbon = document.createElement('div');

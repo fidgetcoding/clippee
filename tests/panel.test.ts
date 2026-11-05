@@ -210,7 +210,7 @@ describe('ask area', () => {
   it('keeps the chips under the Ask ribbon, above the input', () => {
     const p = panel();
     const area = p.el.querySelector('.mrclippy-ask-area');
-    expect(area?.querySelector('.mrclippy-rib')?.textContent).toBe('Ask Mr. Clippy');
+    expect(area?.querySelector('.mrclippy-rib')?.textContent).toBe('Ask Clippee');
     const inner = area?.querySelector('.mrclippy-ask-in');
     expect(inner?.firstElementChild?.classList.contains('mrclippy-chips')).toBe(true);
     expect(inner?.lastElementChild?.tagName).toBe('FORM');
@@ -222,8 +222,8 @@ describe('balloon sheet', () => {
     const anchor = document.createElement('div');
     document.body.appendChild(anchor);
     const balloon = new Balloon(anchor);
-    balloon.suggest('note', [{ label: 'Later', run: () => {} }], 'Mr. Clippy');
-    expect(balloon.el.querySelector('.mrclippy-rib')?.textContent).toBe('Mr. Clippy');
+    balloon.suggest('note', [{ label: 'Later', run: () => {} }], 'Clippee');
+    expect(balloon.el.querySelector('.mrclippy-rib')?.textContent).toBe('Clippee');
     expect(balloon.el.dataset.sheet).toBe('');
     expect(balloon.el.querySelector('.mrclippy-balloon-tip svg')).not.toBeNull();
   });

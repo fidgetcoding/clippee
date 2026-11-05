@@ -5,7 +5,7 @@ export type QueuedTask = (done: () => void) => void;
  * Serialises character actions so animations never overlap.
  *
  * Ported from clippy.js `src/queue.js` (MIT), with an empty-queue callback so the
- * idle scheduler can take over the moment Mr. Clippy has nothing else to do.
+ * idle scheduler can take over the moment Clippee has nothing else to do.
  */
 export class Queue {
   private readonly tasks: { run: QueuedTask; cancel?: () => void }[] = [];

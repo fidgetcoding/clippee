@@ -111,7 +111,7 @@ export class ChatPanel {
     this.notes = new NotesView(options.findings.length, options.docTitle, (on) =>
       this.el.classList.toggle('mrclippy-hide-fixed', on),
     );
-    this.main = this.newThread('Mr. Clippy');
+    this.main = this.newThread('Clippee');
     this.main.log.appendChild(this.notes.el);
     this.active = this.main;
     this.viewport.appendChild(this.main.log);

@@ -59,7 +59,7 @@ export function startPageLifecycle(
     }).catch((error: unknown) => {
       if (attempt !== token || disposed) return;
       attempt = undefined;
-      console.warn('[mr-clippy] failed to start:', error);
+      console.warn('[clippee] failed to start:', error);
       if (startedAt !== location.href) reconcile();
     });
   };
@@ -79,7 +79,7 @@ export function startPageLifecycle(
       reconcile();
     }).catch((error: unknown) => {
       if (!disposed && !suspended && revision === readRevision) {
-        console.warn('[mr-clippy] failed to load preferences:', error);
+        console.warn('[clippee] failed to load preferences:', error);
       }
     });
   };

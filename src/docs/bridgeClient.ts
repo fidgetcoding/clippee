@@ -24,7 +24,7 @@ interface Pending {
  * Every call is timed out. The main-world half may simply not be there — the
  * page could have loaded before the extension, the flag could have been set too
  * late, or Google could have closed the hook between one release and the next —
- * and a bridge that hangs forever would leave Mr. Clippy silently frozen rather than
+ * and a bridge that hangs forever would leave Clippee silently frozen rather than
  * degrading to "I can't read this".
  */
 export class DocsBridgeClient {

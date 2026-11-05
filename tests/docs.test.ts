@@ -92,7 +92,7 @@ describe('bridge client', () => {
 
   it('resolves undefined when no main-world half answers', async () => {
     // The most likely production failure: the page loaded before the extension,
-    // so the flag was never set. Mr. Clippy must degrade, not hang.
+    // so the flag was never set. Clippee must degrade, not hang.
     const client = new DocsBridgeClient(30);
     await expect(client.getText()).resolves.toBeUndefined();
     client.dispose();

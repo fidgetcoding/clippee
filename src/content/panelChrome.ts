@@ -14,7 +14,7 @@ export function button(label: string, className = ''): HTMLButtonElement {
   return b;
 }
 
-/** A navy section ribbon ("Ask Mr. Clippy"). */
+/** A navy section ribbon ("Ask Clippee"). */
 export function ribbon(text: string): HTMLElement {
   const rib = document.createElement('div');
   rib.className = 'mrclippy-rib';
@@ -32,7 +32,7 @@ export interface TitleBar {
 
 /**
  * The top ribbon, which is also the drag handle. On the notes it reads
- * "Mr. Clippy" with Settings as its only control; inside a thread it reads
+ * "Clippee" with Settings as its only control; inside a thread it reads
  * "< Notes" and the thread's title. The X closes the panel (so do clicking
  * him and Escape); he stays on the page.
  */
@@ -45,7 +45,7 @@ export function buildTitleBar(options: ChatPanelOptions): TitleBar {
 
   const title = document.createElement('span');
   title.className = 'mrclippy-title';
-  title.textContent = 'Mr. Clippy';
+  title.textContent = 'Clippee';
 
   const right = document.createElement('span');
   right.className = 'mrclippy-titlebtns';
@@ -137,7 +137,7 @@ export interface AskArea {
   readonly send: HTMLButtonElement;
 }
 
-/** "Ask Mr. Clippy": the ribbon, the chips under it, a sunken box and a big Ask. */
+/** "Ask Clippee": the ribbon, the chips under it, a sunken box and a big Ask. */
 export function buildAskArea(chips: HTMLElement): AskArea {
   const el = document.createElement('div');
   el.className = 'mrclippy-ask-area';
@@ -152,13 +152,13 @@ export function buildAskArea(chips: HTMLElement): AskArea {
   input.className = 'mrclippy-input';
   input.rows = 2;
   input.placeholder = 'Ask a question, or tell me what to change…';
-  input.setAttribute('aria-label', 'Ask Mr. Clippy');
+  input.setAttribute('aria-label', 'Ask Clippee');
 
   const send = button('Ask', 'mrclippy-btn-default mrclippy-send');
   send.type = 'submit';
 
   form.append(input, send);
   inner.append(chips, form);
-  el.append(ribbon('Ask Mr. Clippy'), inner);
+  el.append(ribbon('Ask Clippee'), inner);
   return { el, form, input, send };
 }

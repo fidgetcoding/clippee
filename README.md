@@ -1,8 +1,8 @@
-# Mr. Clippy
+# Clippee by Microshaft
 
 **It looks like you’re reading a README. Would you like help?**
 
-Mr. Clippy is the paperclip from Office 97, back from the dead, with a brain this time. He lives in Google Docs (and most other places you type in a browser), reads what you wrote, and tells you something useful about it. Then he leaves you alone. Mostly.
+Clippee is the paperclip from Office 97, back from the dead, with a brain this time. He lives in Google Docs, Word on the web, and Notion, reads what you wrote, and tells you something useful about it. Then he leaves you alone. Mostly.
 
 ## Why I made this
 
@@ -18,13 +18,13 @@ I built it anyway. Nobody wants a Grammarly. People want Clippy. The paperclip i
 
 Microsoft has a pending trademark application for CLIPPY. It covers software.
 
-This is software. It’s called Mr. Clippy.
+This is software. It’s called Clippee, by Microshaft.
 
 My lawyer would tell me not to do this. I don’t have a lawyer. That’s also part of the strategy.
 
 Here is the business plan in full:
 
-1. Microsoft finds a free browser extension called Mr. Clippy.
+1. Microsoft finds a free browser extension called Clippee, by Microshaft.
 2. Microsoft’s lawyers send me a cease and desist.
 3. I frame it.
 4. I post a photo of the frame.
@@ -50,7 +50,7 @@ Dear Microsoft legal: you own GitHub. You know where I live. Please use the nice
 
 His first real catch was in a comic script of mine: “the same man the reader met on p12,” written twice. He was right. I was annoyed.
 
-**He knows when to shut up.** This is the part 1997 got wrong. He waits for 15 seconds of quiet, speaks at most once every 10 minutes, and never interrupts you mid thought. Wave off the same kind of tip three times and he never shows it again. Clippy learned nothing. Mr. Clippy learns that.
+**He knows when to shut up.** This is the part 1997 got wrong. He waits for 15 seconds of quiet, speaks at most once every 10 minutes, and never interrupts you mid thought. Wave off the same kind of tip three times and he never shows it again. Clippy learned nothing. Clippee learns that.
 
 **He edits when you ask.** Click him, tell him what to fix, and he fixes it. When he’s guessing on his own, he suggests instead, and you accept or reject.
 
@@ -65,8 +65,8 @@ His first real catch was in a comic script of mine: “the same man the reader m
 You need Node.js and an Anthropic API key.
 
 ```bash
-git clone https://github.com/fidgetcoding/mr-clippy.git
-cd mr-clippy
+git clone https://github.com/fidgetcoding/clippee.git
+cd clippee
 npm install
 npm run build
 ```

@@ -85,7 +85,7 @@ export interface SuggestionRequest {
   /**
    * The kind of thing this is — "passive-voice", "thesis-drift", "contradiction".
    * Dismissal memory is keyed on this, not on the individual suggestion, so
-   * rejecting one passive-voice note teaches Mr. Clippy about passive-voice notes.
+   * rejecting one passive-voice note teaches Clippee about passive-voice notes.
    */
   readonly kind: string;
   readonly relevance: Relevance;

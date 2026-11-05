@@ -394,7 +394,7 @@ async function mountRuntime(
             },
           },
         ],
-        'Mr. Clippy',
+        'Clippee',
       );
     }, KEY_PROMPT_DELAY_MS);
   });

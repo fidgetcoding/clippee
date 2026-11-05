@@ -12,7 +12,7 @@ const isFirefox = process.env.TARGET_BROWSER === 'firefox';
  */
 export default defineManifest({
   manifest_version: 3,
-  name: 'Mr. Clippy',
+  name: 'Clippee by Microshaft',
   version: '0.1.0',
   description: 'A writing agent behind the paperclip.',
 
@@ -23,7 +23,7 @@ export default defineManifest({
   // nothing at all.
   action: {
     default_popup: 'src/popup/index.html',
-    default_title: 'Mr. Clippy',
+    default_title: 'Clippee',
   },
 
   // Cross-origin requests go only to the model API and the dormant Drive client.
@@ -86,7 +86,7 @@ export default defineManifest({
   commands: {
     'toggle-mr-clippy': {
       suggested_key: { default: 'Alt+Shift+C' },
-      description: 'Show or hide Mr. Clippy',
+      description: 'Show or hide Clippee',
     },
   },
 

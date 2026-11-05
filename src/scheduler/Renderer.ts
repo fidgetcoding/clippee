@@ -6,14 +6,14 @@ import { MIN_RENDER_GAP_MS, type Breakpoint, type QueuedSuggestion } from './typ
 export interface RendererOptions {
   readonly now?: () => number;
   readonly minGapMs?: number;
-  /** Animation played when Mr. Clippy has something. Non-looping, single gesture. */
+  /** Animation played when Clippee has something. Non-looping, single gesture. */
   readonly attentionAnimation?: string;
   readonly onShown?: (suggestion: QueuedSuggestion) => void;
   readonly onDismissed?: (suggestion: QueuedSuggestion) => void;
 }
 
 /**
- * The only thing in Mr. Clippy permitted to put a suggestion on screen.
+ * The only thing in Clippee permitted to put a suggestion on screen.
  *
  * Producers post to the queue; the detector emits seams; this decides whether
  * anything actually happens. Keeping that decision in exactly one place is what

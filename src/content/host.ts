@@ -11,14 +11,14 @@ export interface Host {
 }
 
 /**
- * Mounts Mr. Clippy inside an open shadow root.
+ * Mounts Clippee inside an open shadow root.
  *
  * Open rather than closed on purpose: closed mode buys obscurity, not security —
  * a hostile page can still find the host element — while making our own debugging
  * materially worse.
  *
  * The host itself is `pointer-events: none` and children opt back in, so the page
- * underneath stays fully clickable everywhere except on Mr. Clippy himself. That is
+ * underneath stays fully clickable everywhere except on Clippee himself. That is
  * the browser equivalent of the per-pixel click-through problem that rules out
  * Electron for the eventual native shell.
  */

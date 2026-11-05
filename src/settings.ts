@@ -17,13 +17,13 @@ export interface Settings {
   muted: boolean;
   /** Epoch ms. Muted until this passes. */
   snoozeUntil: number;
-  /** Hostnames where Mr. Clippy stays away entirely. */
+  /** Hostnames where Clippee stays away entirely. */
   disabledHosts: string[];
   /** Frames the character but plays no sounds by default. */
   soundEnabled: boolean;
   /**
    * Testing aid: drops the ten-minute rate cap and the fifteen-second silence
-   * floor so suggestions surface immediately. Ships off — with it on, Mr. Clippy is
+   * floor so suggestions surface immediately. Ships off — with it on, Clippee is
    * exactly the eager assistant the research says people dislike.
    */
   debugMode: boolean;
@@ -153,7 +153,7 @@ export function onSettingsChanged(listener: (settings: Settings) => void): () =>
   return () => ext.storage.onChanged.removeListener(handler);
 }
 
-/** Should Mr. Clippy appear on this host at all? */
+/** Should Clippee appear on this host at all? */
 export function isActiveOn(settings: Settings, hostname: string): boolean {
   if (!settings.enabled) return false;
   return !settings.disabledHosts.includes(hostname);

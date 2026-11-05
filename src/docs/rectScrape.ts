@@ -11,7 +11,7 @@
  * The cost is that geometry is all you get: rects arrive in paint order, not
  * reading order, so lines have to be rebuilt from coordinates. This is a
  * deliberately simpler reconstruction than Harper's — band grouping and
- * soft-wrap spacing, without their gap-repair heuristics — because Mr. Clippy needs
+ * soft-wrap spacing, without their gap-repair heuristics — because Clippee needs
  * text for statistics, not pixel-accurate ranges for drawing underlines.
  */
 
