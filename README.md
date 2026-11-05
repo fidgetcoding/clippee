@@ -1,8 +1,14 @@
 # Clippee by Microshaft
 
-**It looks like you’re reading a README. Would you like help?**
+**The paperclip is back, and this time he read your doc. Notes and one-click fixes for Google Docs.**
 
-Clippee is the paperclip from Office 97, back from the dead, with a brain this time. He lives in Google Docs, reads what you wrote, and tells you something useful about it. Then he leaves you alone. Mostly.
+It looks like you’re reading a README. Would you like help?
+
+Short version: [ESSENCE.md](ESSENCE.md). How he got built, round by round: [EVOLUTION.md](EVOLUTION.md).
+
+Clippee is the paperclip from Office 97, back from the dead, with a brain this time. He’s a Chrome extension that lives in Google Docs. He reads what you wrote, gives you a short list of notes pinned to the exact spots in your doc, and has a fix ready for each one by the time you look. Every fix shows up as a before and after, and nothing in your doc changes until you click Apply. Then he leaves you alone. Mostly.
+
+He runs on Claude, with your own Anthropic API key.
 
 ## Why I made this
 
@@ -42,27 +48,15 @@ Microsoft retired him in 2001 and spent the next 25 years putting him in jokes, 
 
 Dear Microsoft legal: you own GitHub. You know where I live. Please use the nice paper.
 
-## What he actually does
-
-**He reads Google Docs.** Google Docs draws your text as a picture, which normally leaves extensions blind. I took apart the code Google ships to every browser and found the switch that lets an extension read the page. It doesn’t check who’s asking. Any value turns it on.
-
-**He catches what spellcheck can’t.** The same phrase used twice three pages apart. Every paragraph opening the same way. Sentences that all run the same length. Readability scored by seven formulas that vote. 66 checks in all.
-
-His first real catch was in a comic script of mine: “the same man the reader met on p12,” written twice. He was right. I was annoyed.
-
-**He knows when to shut up.** This is the part 1997 got wrong. He waits for 15 seconds of quiet, speaks at most once every 10 minutes, and never interrupts you mid thought. Wave off the same kind of tip three times and he never shows it again. Clippy learned nothing. Clippee learns that.
-
-**He edits when you ask.** Click him, tell him what to fix, and he fixes it. When he’s guessing on his own, he suggests instead, and you accept or reject.
-
-**He checks your structure.** He notices when your intro promises a section you never wrote.
-
-**He looks right.** Navy title bar. Beveled buttons. MS Sans Serif. Zero rounded corners.
-
-**He’s fast.** An 11,000 word document takes him 63 milliseconds.
-
 ## Install
 
-You need Node.js and an Anthropic API key.
+You need three things:
+
+- **Chrome**, or another Chromium browser that loads unpacked extensions (Arc, Brave, Edge, Opera, Vivaldi). I test in Chrome.
+- **Node.js 22.12 or newer.** 20.19 works too.
+- **An Anthropic API key.** Get one at [console.anthropic.com](https://console.anthropic.com/settings/keys). Opening the panel has him write fixes with Claude on your key, so it spends your credits.
+
+**1. Build it**
 
 ```bash
 git clone https://github.com/fidgetcoding/clippee.git
@@ -71,27 +65,92 @@ npm install
 npm run build
 ```
 
-**Chrome, Arc, Brave, Edge, Opera, Vivaldi:** go to `chrome://extensions`, turn on Developer mode, click **Load unpacked**, and pick the `dist` folder.
+The extension lands in `dist/`.
 
-**Firefox:** run `npm run build:firefox`, go to `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and pick `dist-firefox/manifest.json`.
+**2. Load it into Chrome**
 
-Then click the extension icon, paste your Anthropic API key, and open a Google Doc. Your key stays on your machine and never touches the page you’re writing in.
+1. Go to `chrome://extensions`.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and pick the `dist` folder.
+4. Pin **Clippee by Microshaft** to the toolbar so you can find him.
+
+Leave the folder where it is. Chrome knows the extension by its path, so a moved folder comes back as a brand new extension with empty Settings.
+
+**3. Give him your key**
+
+Click the toolbar button and paste your key into **Step 1 · Your Claude API key**. It’s stored on this machine only, never synced, and it stays in the extension’s background worker, so the page you’re writing in never sees it. If your key says it needs a workspace, open **Key says it needs a workspace?** and paste the workspace ID.
+
+**4. Open a Google Doc**
+
+Open any doc at `docs.google.com/document/d/…`. If the doc was already open before you installed him, reload the tab. He has to get in before Docs starts up, or the page stays unreadable to him.
+
+He shows up in the corner and says hello. Click him to open the panel. `Alt+Shift+C` shows or hides him.
+
+**Updating**
+
+```bash
+git pull
+npm install
+npm run build
+```
+
+Then hit the reload arrow on his card at `chrome://extensions` and reload your Doc tab.
+
+**Firefox:** run `npm run build:firefox`, go to `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and pick `dist-firefox/manifest.json`. Firefox forgets temporary add-ons when it restarts. The Firefox build compiles, but I do all my testing in Chrome, so treat Firefox as untried.
 
 **Bring your own paperclip.** Characters load as data from `src/packs/<name>/`: a sprite sheet (`map.png`) and a timing file (`pack.json`), in the same format clippy.js uses. Draw your own, or bring one you have the rights to.
+
+## What he actually does
+
+**He reads Google Docs.** Google Docs draws your text as a picture, which normally leaves extensions blind. I took apart the code Google ships to every browser and found the switch that lets an extension read the page. It doesn’t check who’s asking. Any value turns it on.
+
+**He leaves notes you can find.** Every note points at a real passage. Hover one and he highlights it in your doc, bright yellow with a red underline, the way clicking a comment does. He catches what spellcheck can’t: the same phrase twice within a few paragraphs, a run of sentences that all start the same way, a paragraph twice your average length, hedges, weasel words, wordiness, passive voice. For reading level, seven readability formulas vote, and when most of them say it’s hard, he points at the one sentence doing the most damage.
+
+His first real catch was in a comic script of mine: “the same man the reader met on p12,” written twice. He was right. I was annoyed.
+
+**He has the fix ready.** When you open the panel he starts writing a fix for every note in the background, a few at a time, so most rows already have Apply waiting. Each fix is a before and after with only the changed words marked. Apply it or skip it. An applied fix gets Undo, and Undo turns into Redo. **Fix all** does the whole list, with one Undo for the set.
+
+**You can talk to him on every screen.** The Ask box sits at the bottom of every view. Ask about a fix, ask him to change something, or tell him what to do with the panel. “hide applied”, “undo all”, “go back” and “snooze 1h” run instantly on your machine with no call to Claude, and “hid applied” still works. Anything looser goes to Claude with a snapshot of the panel. He presses the same buttons you would, then tells you in one line what he did.
+
+**He knows when to shut up.** This is the part 1997 got wrong. He waits for 15 seconds of quiet, speaks up on his own at most once every 10 minutes, and never interrupts you mid thought. Wave off the same kind of tip three times and he never shows it again. Clippy learned nothing. Clippee learns that.
+
+**He checks your structure when you ask.** Type “check my structure” and he looks for things your intro promises that the rest of the doc never delivers.
+
+**He looks the part.** A cream speech balloon with an indigo ribbon, beveled buttons, Tahoma and etched group boxes, all a few shades off the Windows 98 originals. He stands on his own next to the panel, never boxed inside it.
+
+**He’s fast where it counts.** The local checks read an 11,000 word document in about 64 milliseconds. The fixes come from Claude and take longer, which is why he writes them while you read.
 
 ## Not done yet
 
 - **Memory of your own writing.** He can search the Drive folders you pick and tell you when today’s draft contradicts something you wrote four months ago. The code exists. It needs a Google Cloud sign in setup I haven’t done yet, so it’s off.
 - **A folder picker** for choosing those folders.
-- **Live testing of edits** written straight into a Doc.
+- **CI.** The tests run on my machine. None of them touch a real Google Doc: the suite uses a fake Docs shaped like the live one, and I check the real thing by hand in my own Chrome.
+- **Running the panel from plain words** passes its tests, but it hasn’t had much real use against the live API yet. Expect him to misread a loose request now and then.
 
 ## For developers
 
 ```bash
-npm run dev         # watch mode
-npm test            # regression suite
+npm run dev            # watch mode
+npm test               # 280 tests across 33 files
 npm run typecheck
+npm run build          # Chromium build into dist/
+npm run build:firefox  # Firefox build into dist-firefox/
 ```
+
+Where things live:
+
+- `src/docs/`: the Google Docs bridge. It sets the page flag, reads the text, moves the selection and writes edits.
+- `src/checks/`: the local checks.
+- `src/scheduler/`: the rules for when he’s allowed to speak.
+- `src/agent/`: the Claude calls, the prompts, the edit tool and the panel tool.
+- `src/content/`: the panel, notes, previews, Undo and the Ask box.
+- `src/character/`: the animation engine.
+- `src/background/`: the service worker, which holds your key and makes the API calls.
+- `src/popup/`: Settings.
+- `src/corpus/`: Drive memory, built and switched off.
+- `src/packs/`: character packs.
+
+Edits go through the page, not the Docs API. He selects the passage, pastes the replacement into Docs’ own text box, then reads the doc back to check it landed. That’s why there’s no Google Cloud project or sign in to set up. The model is `claude-opus-5-5`, set in `src/agent/client.ts`.
 
 ## Credits
 
