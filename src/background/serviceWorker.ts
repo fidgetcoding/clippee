@@ -22,6 +22,35 @@ ext.commands?.onCommand.addListener((command) => {
   void relayToActiveTab({ type: 'mrclippy:toggle' });
 });
 
+/**
+ * The toolbar button. While he is here it opens Settings, as always. While he
+ * is away (his X, the shortcut) a tab's popup is switched off, so the click
+ * reaches `onClicked` and just brings him back, with no Settings window
+ * dropping over his entrance. Chrome pins that popup under the icon; moving it
+ * isn't possible, so it gets out of the way instead. Settings stays one
+ * right-click away under Options.
+ */
+const SETTINGS_POPUP = 'src/popup/index.html';
+
+function setAway(tabId: number, away: boolean): Promise<void> {
+  return ext.action.setPopup({ tabId, popup: away ? '' : SETTINGS_POPUP });
+}
+
+ext.action?.onClicked?.addListener((tab) => {
+  if (tab.id === undefined) return;
+  const tabId = tab.id;
+  void ext.tabs.sendMessage(tabId, { type: 'mrclippy:summon' }).catch(() => {
+    // Nobody on this tab to summon (it navigated somewhere he doesn't run):
+    // the popup comes back, and this click opens Settings.
+    void setAway(tabId, false).then(() => openSettings(tab.url)).catch(() => undefined);
+  });
+});
+
+// A new page in the tab starts with Settings on the button; his page says if he's away.
+ext.tabs?.onUpdated?.addListener((tabId, change) => {
+  if (change.status === 'loading') void setAway(tabId, false).catch(() => undefined);
+});
+
 ext.runtime.onMessage.addListener(
   (message: unknown, sender, sendResponse: (response: AskResponse | AuditResponse | SettingsResponse | { hasKey: boolean }) => void) => {
     if (isType(message, 'mrclippy:settings')) {
@@ -35,6 +64,11 @@ ext.runtime.onMessage.addListener(
         () => sendResponse({ ok: false, error: 'Could not save settings. Try again.' }),
       );
       return true;
+    }
+    if (isType(message, 'mrclippy:away')) {
+      const tabId = sender.tab?.id;
+      if (tabId !== undefined) void setAway(tabId, (message as { away?: unknown }).away === true).catch(() => undefined);
+      return false;
     }
     if (isType(message, 'mrclippy:open-settings')) {
       void openSettings(sender.tab?.url).catch(() => undefined);

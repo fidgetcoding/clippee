@@ -20,7 +20,6 @@ import { APPEAR_POOL, DISAPPEAR_POOL, FxDeck, drawFromBag, type BagState } from 
 import { FxPlayer } from '../src/fx/FxPlayer';
 import type { FxKind, LabFx } from '../src/fx/types';
 import { Presence, RETURN_AFTER_MS, type PresenceAgent, type PresencePlayer } from '../src/content/presence';
-import { summonOnActiveTab } from '../src/popup/summon';
 import { fixAllBar } from '../src/content/changeCards';
 import type { AgentChange, Thread } from '../src/content/chatTypes';
 
@@ -314,28 +313,6 @@ describe('the player', () => {
     const done = player.play(fx, 'disappear', { x: 0, y: 0 });
     player.cancel();
     await expect(done).resolves.toBe(false);
-  });
-});
-
-describe('the toolbar button', () => {
-  it('asks the active tab to bring him back', async () => {
-    store.query.mockResolvedValue([{ id: 42 }]);
-    store.send.mockResolvedValue(undefined);
-    await summonOnActiveTab('');
-    expect(store.query).toHaveBeenCalledWith({ active: true, currentWindow: true });
-    expect(store.send).toHaveBeenCalledWith(42, { type: 'mrclippy:summon' });
-  });
-
-  it('does not summon from Settings opened as its own window', async () => {
-    await summonOnActiveTab('?host=docs.google.com');
-    expect(store.query).not.toHaveBeenCalled();
-    expect(store.send).not.toHaveBeenCalled();
-  });
-
-  it('shrugs off a tab with no Clippee on it', async () => {
-    store.query.mockResolvedValue([{ id: 7 }]);
-    store.send.mockRejectedValue(new Error('Receiving end does not exist.'));
-    await expect(summonOnActiveTab('')).resolves.toBeUndefined();
   });
 });
 

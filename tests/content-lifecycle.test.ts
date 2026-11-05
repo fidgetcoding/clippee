@@ -448,21 +448,27 @@ it('comes back on his own 5 minutes after X', async () => {
   expect(agent.hidden).toBe(false);
 });
 
-it('comes back at once when the toolbar popup summons him, and ignores it while he is here', async () => {
+it('comes back at once when the toolbar button summons him, and keeps the button in step', async () => {
   vi.useFakeTimers();
   await import('../src/content/index');
   await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')).not.toBeNull());
   const message = state.addListener.mock.calls[0]![0];
   const root = document.querySelector('#mrclippy-host')!.shadowRoot!;
   const agent = root.querySelector<HTMLElement>('.mrclippy-agent')!;
-  message({ type: 'mrclippy:summon' });
-  expect(agent.hidden).toBe(false);
+  const away = () => state.sendMessage.mock.calls.filter(([m]) => m.type === 'mrclippy:away').map(([m]) => m.away);
+  expect(away()).toEqual([false]);
   root.querySelector<HTMLButtonElement>('.mrclippy-agent-close')!.click();
   await vi.advanceTimersByTimeAsync(1);
   expect(agent.hidden).toBe(true);
+  // Away: the button stops opening Settings so it can call him back.
+  expect(away()).toEqual([false, true]);
   message({ type: 'mrclippy:summon' });
   expect(agent.hidden).toBe(false);
+  expect(away()).toEqual([false, true, false]);
   // The summon replaced the 5 minute return: nothing brings him back twice.
   await vi.advanceTimersByTimeAsync(15 * 60_000);
   expect(agent.hidden).toBe(false);
+  // Clicked while he is here, the button was out of step: Settings, and it is put right.
+  message({ type: 'mrclippy:summon' });
+  expect(state.sendMessage.mock.calls.some(([m]) => m.type === 'mrclippy:open-settings')).toBe(true);
 });

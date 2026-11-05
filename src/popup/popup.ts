@@ -8,7 +8,6 @@ import {
   toggleHost,
   type Settings,
 } from '../settings';
-import { summonOnActiveTab } from './summon';
 
 const DISMISSAL_KEY = 'mrclippy:dismissals';
 
@@ -25,7 +24,9 @@ async function currentHost(): Promise<string | undefined> {
   const [tab] = await ext.tabs.query({ active: true, currentWindow: true });
   if (!tab?.url) return undefined;
   try {
-    return new URL(tab.url).hostname;
+    // Opened as Options, the active tab is chrome://extensions: no site.
+    const url = new URL(tab.url);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.hostname : undefined;
   } catch {
     return undefined;
   }
@@ -63,7 +64,6 @@ function paint(settings: Settings, host: string | undefined): void {
 }
 
 async function main(): Promise<void> {
-  void summonOnActiveTab();
   const host = await currentHost();
   let settings = await loadSettings();
   paint(settings, host);

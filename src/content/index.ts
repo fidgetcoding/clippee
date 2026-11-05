@@ -19,12 +19,15 @@ import { isWritingSurface } from './surfaces';
 import { Highlighter } from './highlight';
 import { loadLayout, makePanelMovable, saveLayout } from './layout';
 import { ChatPanel, docTitleFrom, type AgentChange, type AgentReply } from './chatPanel';
-import type { AskResponse, AuditResponse, ChatTurn, DocumentEdit } from '../agent/types';
+import type { ChatTurn, DocumentEdit } from '../agent/types';
 import type { PanelState, SnoozeLength } from '../agent/panelTools';
-import { EditHistory } from './editHistory';
+import { DocEdits } from './docEdits';
 import { startPageLifecycle, type PageRuntime } from './pageLifecycle';
-import { GREETING_WAVE_FRAME, Presence, RETURN_AFTER_MS, prefersReducedMotion } from './presence';
+import {
+  GREETING_WAVE_FRAME, Presence, RETURN_AFTER_MS, prefersReducedMotion, reportAway, returnWhenSeen,
+} from './presence';
 import { askForKey, hasApiKey, openSettings } from './settingsLink';
+import { askWorker, auditWorker } from './workerClient';
 import { FxPlayer } from '../fx/FxPlayer';
 import { FxDeck } from '../fx/pools';
 
@@ -94,6 +97,9 @@ async function mountRuntime(
     // Loaded the first time he makes an entrance, not with the page.
     effects: () => import('../fx/generated/labFx').then((m) => m.createLabFx()),
     reducedMotion: prefersReducedMotion,
+    // Away, the toolbar button calls him back instead of opening Settings over his entrance.
+    onAway: (away) => reportAway(away),
+    ...returnWhenSeen,
     onArrived: (returning, entered) => {
       // Greeting draws him in from a bare wire before he waves. After an
       // entrance he is already standing there, so it starts at the wave.
@@ -173,7 +179,7 @@ async function mountRuntime(
   /** The open panel was built without a key, so it drafts nothing yet. */
   let panelNeedsKey = false;
 
-  const editHistory = new EditHistory(source);
+  const editHistory = new DocEdits(source);
 
   /**
    * Fix drafts, keyed by question and the document they were drafted against.
@@ -216,43 +222,18 @@ async function mountRuntime(
 
   /** Send a question to the background worker, which owns the API key. */
   async function askAgentUncached(
-    question: string,
-    history: readonly ChatTurn[],
-    document_: string,
-    canEdit: boolean,
-    panel?: PanelState,
+    question: string, history: readonly ChatTurn[], document_: string, canEdit: boolean, panel?: PanelState,
   ): Promise<AgentReply> {
     if (disposed) throw new Error('Panel closed.');
-    const findings = review(document_).map((f) => f.text);
-
-    const response = (await ext.runtime.sendMessage({
-      type: 'mrclippy:ask',
-      question,
-      document: document_,
-      history,
-      findings,
-      canEdit,
-      ...(panel ? { panel } : {}),
-    })) as AskResponse | undefined;
-
-    if (!response) throw new Error('No reply from the background worker. Try reloading the tab.');
-    if (!response.ok) {
-      if (response.needsKey) openSettings(false);
-      throw new Error(response.error);
-    }
-    // Proposals only. Nothing touches the document until the user applies one.
-    // Actions run through the panel's own buttons, which have Undo.
-    return {
-      text: response.text,
-      ...(response.edits && response.edits.length > 0 ? { proposals: response.edits } : {}),
-      ...(response.actions && response.actions.length > 0 ? { actions: response.actions } : {}),
-    };
+    return askWorker(question, history, document_, canEdit, panel);
   }
 
   /** The user accepted one or more proposals. */
-  async function applyProposals(edits: readonly DocumentEdit[], context = source.context?.()): Promise<AgentChange[]> {
+  async function applyProposals(
+    edits: readonly DocumentEdit[], context = source.context?.(), origin?: string,
+  ): Promise<AgentChange[]> {
     void agent.play('Writing');
-    const changes = await editHistory.apply(edits, context);
+    const changes = await editHistory.apply(edits, context, origin);
     // Anything he typed is new text: re-review it at the next seam, not now.
     lastReviewed = '';
     return changes;
@@ -285,24 +266,7 @@ async function mountRuntime(
     }
     if (!text) return source.explainFailure?.() ?? "I can't read this document.";
 
-    const response = (await ext.runtime.sendMessage({
-      type: 'mrclippy:audit',
-      document: text,
-    })) as AuditResponse | undefined;
-
-    if (!response) throw new Error('No reply from the background worker. Try reloading the tab.');
-    if (!response.ok) {
-      if (response.needsKey) openSettings(false);
-      throw new Error(response.error);
-    }
-
-    if (response.findings.length === 0) {
-      return 'Structurally it holds up. Nothing promised that you did not deliver.';
-    }
-
-    return response.findings
-      .map((f) => (f.evidence ? `${f.problem}\n\n  "${f.evidence}"` : f.problem))
-      .join('\n\n');
+    return auditWorker(text);
   }
 
   function openPanel(): void {
@@ -350,7 +314,9 @@ async function mountRuntime(
         onAsk: (question, history, panelState) => context === source.context?.()
           ? askAgent(question, history, panelState)
           : Promise.reject(new Error('The active editor changed. Reopen the panel.')),
-        onApply: (edits) => applyProposals(edits, context),
+        onApply: (edits, origin) => applyProposals(edits, context, origin),
+        history: editHistory.history,
+        liveChanges: (ids) => editHistory.history.liveChanges(ids),
         onLocate: locatePassage,
         onRedo: async (changes) => {
           const result = await editHistory.redo(changes, context);
@@ -454,8 +420,15 @@ async function mountRuntime(
       if (presence.here) closePanel();
       presence.toggle();
     }
-    // The toolbar button: the popup asks the tab to bring him back now.
-    if (type === 'mrclippy:summon' && !presence.here) presence.arrive();
+    // The toolbar button while he's away. Clicked while he's here (the button
+    // fell out of step), it puts Settings back on the button and opens it.
+    if (type === 'mrclippy:summon') {
+      if (!presence.here) presence.arrive();
+      else {
+        reportAway(false);
+        openSettings();
+      }
+    }
     if (type === 'mrclippy:mute') {
       void toggleMuted().catch(() => undefined);
     }
@@ -475,6 +448,7 @@ async function mountRuntime(
     source.dispose?.();
     highlighter.dispose();
     presence.dispose();
+    reportAway(false);
     player.destroy();
     agent.destroy();
     host.destroy();

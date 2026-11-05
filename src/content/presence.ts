@@ -1,4 +1,5 @@
 import type { FxKind, LabFx } from '../fx/types';
+import { ext } from '../platform';
 
 /** After X, he comes back on his own. Nate: "he should always reappear again after a certain amount of time". */
 export const RETURN_AFTER_MS = 5 * 60_000;
@@ -14,6 +15,24 @@ export function prefersReducedMotion(): boolean {
   return typeof window.matchMedia !== 'function' ||
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
+
+/** Tell the worker, which keeps the toolbar button in step with him on this tab. */
+export function reportAway(away: boolean): void {
+  void ext.runtime.sendMessage({ type: 'mrclippy:away', away }).catch(() => undefined);
+}
+
+/** His return waits until someone can see it: this tab visible and focused. */
+export const returnWhenSeen: Pick<PresenceOptions, 'ready' | 'watchReady'> = {
+  ready: () => document.visibilityState === 'visible' && document.hasFocus(),
+  watchReady: (changed) => {
+    document.addEventListener('visibilitychange', changed);
+    window.addEventListener('focus', changed);
+    return () => {
+      document.removeEventListener('visibilitychange', changed);
+      window.removeEventListener('focus', changed);
+    };
+  },
+};
 
 /** The parts of the Agent that arriving and leaving need. */
 export interface PresenceAgent {
@@ -46,6 +65,14 @@ export interface PresenceOptions {
    * page; `entered` is true when an entrance brought him (he is already at rest).
    */
   readonly onArrived?: (returning: boolean, entered: boolean) => void;
+  /** Whether he is away (or leaving) changed. The toolbar button follows it. */
+  readonly onAway?: (away: boolean) => void;
+  /**
+   * Coming back on his own waits for a reader: the tab visible and focused.
+   * `watch` calls back when that may have changed and returns an unsubscribe.
+   */
+  readonly ready?: () => boolean;
+  readonly watchReady?: (changed: () => void) => () => void;
   readonly returnAfterMs?: number;
 }
 
@@ -67,6 +94,7 @@ export class Presence {
   private arrivedOnce = false;
   private disposed = false;
   private returnTimer: ReturnType<typeof setTimeout> | undefined;
+  private stopWatching: (() => void) | undefined;
   private library: Readonly<Record<string, LabFx>> | undefined;
 
   constructor(private readonly options: PresenceOptions) {}
@@ -79,22 +107,29 @@ export class Presence {
   /** Arrive now (first appearance, the toolbar button, the shortcut). */
   arrive(): void {
     this.clearReturn();
-    this.wanted = 'present';
+    this.want('present');
     this.run();
   }
 
   /** Leave, and come back on his own after a while. */
   leave(): void {
-    this.wanted = 'away';
+    this.want('away');
     this.scheduleReturn();
     this.run();
   }
 
   /** Away already (restored from the back/forward cache hidden); still comes back. */
   startAway(): void {
-    this.where = this.wanted = 'away';
+    this.where = 'away';
+    this.want('away', true);
     this.agentHide();
     this.scheduleReturn();
+  }
+
+  private want(where: Where, always = false): void {
+    if (this.wanted === where && !always) return;
+    this.wanted = where;
+    this.options.onAway?.(where === 'away');
   }
 
   toggle(): void {
@@ -112,13 +147,31 @@ export class Presence {
     this.clearReturn();
     this.returnTimer = setTimeout(() => {
       this.returnTimer = undefined;
-      if (!this.disposed) this.arrive();
+      if (!this.disposed) this.returnWhenReady();
     }, this.options.returnAfterMs ?? RETURN_AFTER_MS);
+  }
+
+  /**
+   * An entrance nobody sees is wasted, and one under the toolbar popup is
+   * covered: with the tab hidden or not focused, he waits for the reader.
+   */
+  private returnWhenReady(): void {
+    const { ready, watchReady } = this.options;
+    if (!ready || !watchReady || ready()) {
+      this.arrive();
+      return;
+    }
+    this.stopWatching = watchReady(() => {
+      if (this.disposed || this.wanted === 'present' || !ready()) return;
+      this.arrive();
+    });
   }
 
   private clearReturn(): void {
     if (this.returnTimer !== undefined) clearTimeout(this.returnTimer);
     this.returnTimer = undefined;
+    this.stopWatching?.();
+    this.stopWatching = undefined;
   }
 
   /**

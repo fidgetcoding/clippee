@@ -39,6 +39,13 @@ export default defineManifest({
     },
   },
 
+  // Settings, one right-click away (Options). While he is away the toolbar
+  // button brings him back instead of opening it.
+  options_ui: {
+    page: 'src/popup/index.html',
+    open_in_tab: false,
+  },
+
   // Cross-origin requests go only to the model API and the dormant Drive client.
   // Editor injection is scoped separately by content_scripts below.
   host_permissions: ['https://api.anthropic.com/*', 'https://www.googleapis.com/*'],
