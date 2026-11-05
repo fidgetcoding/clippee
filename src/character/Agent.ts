@@ -51,6 +51,10 @@ export class Agent {
   private shown = false;
   private destroyed = false;
   private hideTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly size: { w: number; h: number };
+  private readonly onMoved: ((position: { x: number; y: number }) => void) | undefined;
+  /** A window that shrank (or a spot saved in a bigger one) never leaves him off screen. */
+  private readonly onResize = (): void => this.keepOnScreen();
   private idleCap: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
@@ -107,14 +111,12 @@ export class Agent {
       x: Math.max(16, window.innerWidth - w - 32),
       y: Math.max(16, window.innerHeight - h - 32),
     };
+    this.size = { w, h };
+    this.onMoved = options.onMoved;
     // A remembered spot from a bigger window could be off screen; keep him on it.
-    this.position = options.position
-      ? {
-          x: Math.min(Math.max(0, options.position.x), Math.max(0, window.innerWidth - w)),
-          y: Math.min(Math.max(0, options.position.y), Math.max(0, window.innerHeight - h)),
-        }
-      : fallback;
+    this.position = options.position ? this.clamp(options.position) : fallback;
     this.applyPosition();
+    window.addEventListener('resize', this.onResize);
 
     this.wireInteraction(options.onClick, options.onMoved);
   }
@@ -151,9 +153,31 @@ export class Agent {
     return this.shown;
   }
 
-  /** Top-left of his sprite box, in viewport pixels. Entrances and exits start here. */
+  /**
+   * Top-left of his sprite box, in viewport pixels. Entrances and exits start
+   * here, so it is pulled back on screen first.
+   */
   get spot(): { x: number; y: number } {
+    this.keepOnScreen();
     return { ...this.position };
+  }
+
+  /** His whole box inside the window. */
+  private clamp(at: { x: number; y: number }): { x: number; y: number } {
+    return {
+      x: Math.min(Math.max(0, at.x), Math.max(0, window.innerWidth - this.size.w)),
+      y: Math.min(Math.max(0, at.y), Math.max(0, window.innerHeight - this.size.h)),
+    };
+  }
+
+  /** Pull him back inside the window if he is not, and remember where. */
+  keepOnScreen(): void {
+    const at = this.clamp(this.position);
+    if (at.x === this.position.x && at.y === this.position.y) return;
+    this.position = at;
+    this.applyPosition();
+    if (this.balloon.visible) this.balloon.position();
+    this.onMoved?.({ ...at });
   }
 
   /**
@@ -164,6 +188,7 @@ export class Agent {
     if (this.shown || this.destroyed) return;
     if (this.hideTimer !== undefined) clearTimeout(this.hideTimer);
     this.hideTimer = undefined;
+    this.keepOnScreen();
     this.shown = true;
     this.root.hidden = false;
     const entrance = animated ? 'Show' : 'RestPose';
@@ -304,14 +329,16 @@ export class Agent {
     this.queue.clear();
   }
 
+  /** Dragging can't take him past the edge of the window. */
   moveTo(x: number, y: number): void {
-    this.position = { x, y };
+    this.position = this.clamp({ x, y });
     this.applyPosition();
     if (this.balloon.visible) this.balloon.position();
   }
 
   destroy(): void {
     this.destroyed = true;
+    window.removeEventListener('resize', this.onResize);
     this.shown = false;
     if (this.idleCap !== undefined) clearTimeout(this.idleCap);
     this.idleCap = undefined;
