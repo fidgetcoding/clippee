@@ -117,7 +117,7 @@ function openSettings(fromUrl?: string): Promise<void> {
 }
 
 async function openSettingsOnce(fromUrl?: string): Promise<void> {
-  if (await focusOpenSettings()) return;
+  // The toolbar popup first: it is the fast path, and Chrome never stacks it.
   try {
     await ext.action.openPopup();
     return;

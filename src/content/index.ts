@@ -40,13 +40,17 @@ const DEBUG_SILENCE_MS = 3_000;
  * an explicit click, both of which the user initiated.
  */
 /**
- * Ask the background to open Settings. It owns the window; we only ask, and
- * only once per few seconds: several fixes failing together is one problem.
+ * Ask the background to open Settings. It owns the window; we only ask. A
+ * click always goes through; an automatic ask (a request failed for want of
+ * a key) goes once per few seconds, since several failing together is one
+ * problem.
  */
-let lastSettingsAsk = 0;
-function openSettings(): void {
-  if (Date.now() - lastSettingsAsk < 5_000) return;
-  lastSettingsAsk = Date.now();
+let lastAutoSettings = 0;
+function openSettings(clicked = true): void {
+  if (!clicked) {
+    if (Date.now() - lastAutoSettings < 5_000) return;
+    lastAutoSettings = Date.now();
+  }
   void ext.runtime.sendMessage({ type: 'mrclippy:open-settings' }).catch(() => undefined);
 }
 
@@ -207,7 +211,7 @@ async function mountRuntime(
 
     if (!response) throw new Error('No reply from the background worker. Try reloading the tab.');
     if (!response.ok) {
-      if (response.needsKey) openSettings();
+      if (response.needsKey) openSettings(false);
       throw new Error(response.error);
     }
     if (!response.edits || response.edits.length === 0) return { text: response.text };
@@ -259,7 +263,7 @@ async function mountRuntime(
 
     if (!response) throw new Error('No reply from the background worker. Try reloading the tab.');
     if (!response.ok) {
-      if (response.needsKey) openSettings();
+      if (response.needsKey) openSettings(false);
       throw new Error(response.error);
     }
 
