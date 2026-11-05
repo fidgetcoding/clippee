@@ -188,7 +188,7 @@ Then, the same night, v2.1.1:
 - **Owed from 2.1.1:** the no-repeat idle bag was supposed to carry across tabs and reloads. It wasn't hooked up. Now it is.
 - **Picked, a smaller icon:** the option called "1.5x, heavier shaft". The 16 and 32 pixel icons in the toolbar, the panel's title bar and Settings are new, squares snapped to whole pixels and the curves smoothed. The big icons stay as they were.
 - **Picked, a banner:** the boot splash, "this one for sure!" It's at the top of the README: a 1997 boot screen with Clippee waiting at the end of the progress bar.
-- **v2.2.1, white:** "Can we actually keep the dick part white for all of them, same size and shape but white regardless of background, banner as well." Every icon, the title-bar and Settings marks and the banner now cut the same shape out in white.
+- **v2.2.1, white:** "Can we actually keep the [cut-out] part white for all of them, same size and shape but white regardless of background, banner as well." Every icon, the title-bar and Settings marks and the banner now cut the same shape out in white.
 - **Tested:** 354 tests, including the bug hunt's own repro of the stranded read, the watchdog, a shrinking window, a drag past the edge and the panel layout. The built extension, in Chromium: dragged past the corner he stayed inside, a window shrunk to 900 by 560 brought him back fully in view, and the panel opened beside him with its tail across three reloads.
 
 ## 5. Feature family tree
