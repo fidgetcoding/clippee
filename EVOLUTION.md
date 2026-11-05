@@ -36,22 +36,22 @@ Then I asked for the README you're probably reading next to this:
 | Aug 27 to 28 | 11 research lanes. The live Docs bundle decompiled: any value opens the page flag | Private note |
 | Aug 28 | 21 decision spec in 5 rounds. Renamed Mr. Clippy | Private note |
 | Aug 28 | Extension built: Docs bridge, 66 checks, interruption rules, chat panel, Drive memory (switched off). 126 tests. First live catch | Private note |
-| Nov 2 | First commit, with the cease and desist README and the MIT license | `19ee048` |
-| Nov 2 to 3 | Editing in Docs through the page. Two selection bugs found live. 146 tests | `657a803` |
-| Nov 3 | Buttons fixed, editors only, Settings, previews, highlights, threads, background drafts, Fix all. 167 tests | `cb3fb8c` |
-| Nov 3 | Quick UI tightening, then a 4 round panel design lab. D3 locked | `5cb8d5f`, private note |
-| Nov 3 | D3 built into the extension. 183 tests | `e54f712` |
-| Nov 4 | Close X on the panel; his own X fixed. 185 tests | `7b396b1` |
-| Nov 4 | Hardening release: page lifecycle, settings, document safety. 249 tests plus 15 checks on the built extension | `39e96d6` |
-| Nov 5 | The closed panel that stayed open. Plainer notes. 254 tests | `f64d086` |
-| Nov 5 | Renamed Clippee by Microshaft | `506a59d`, `1c78e38` |
-| Nov 5 | No key means one line and one Settings window. 257 tests | `199046a` |
-| Nov 5 | Google Docs only in the description and docs | `2017c63` |
-| Nov 5 | Settings opens on every click | `d054980` |
-| Nov 5 | Ask box on every screen; the panel runs from plain words. 280 tests | `d870d45` |
-| Nov 5 | Palette lab, 2 rounds. Warmer locked | `5b2e251` |
-| Nov 5 | Logo lab, 4 rounds and a final. Microshaft icon shipped | `0b1a173` |
-| Nov 5 | Clippee's own art: 18 animations redrawn on the 1997 timings, Microsoft's pack removed, Thinking while fixes draft. 285 tests | `2f95b6c` |
+| Nov 2 | First commit, with the cease and desist README and the MIT license | `e748ab1` |
+| Nov 2 to 3 | Editing in Docs through the page. Two selection bugs found live. 146 tests | `86fd866` |
+| Nov 3 | Buttons fixed, editors only, Settings, previews, highlights, threads, background drafts, Fix all. 167 tests | `4c41f45` |
+| Nov 3 | Quick UI tightening, then a 4 round panel design lab. D3 locked | `ecc2edc`, private note |
+| Nov 3 | D3 built into the extension. 183 tests | `d9f892a` |
+| Nov 4 | Close X on the panel; his own X fixed. 185 tests | `361e852` |
+| Nov 4 | Hardening release: page lifecycle, settings, document safety. 249 tests plus 15 checks on the built extension | `3b5c153` |
+| Nov 5 | The closed panel that stayed open. Plainer notes. 254 tests | `108a936` |
+| Nov 5 | Renamed Clippee by Microshaft | `5f76302`, `3b73a15` |
+| Nov 5 | No key means one line and one Settings window. 257 tests | `b6fa03c` |
+| Nov 5 | Google Docs only in the description and docs | `972d1ad` |
+| Nov 5 | Settings opens on every click | `4b9a33a` |
+| Nov 5 | Ask box on every screen; the panel runs from plain words. 280 tests | `7439b11` |
+| Nov 5 | Palette lab, 2 rounds. Warmer locked | `7e12fd2` |
+| Nov 5 | Logo lab, 4 rounds and a final. Microshaft icon shipped | `a5179e0` |
+| Nov 5 | Clippee's own art: 18 animations redrawn on the 1997 timings, Microsoft's pack removed, Thinking while fixes draft. 285 tests | `cc622fd` |
 
 ## 4. Round by round
 
@@ -65,7 +65,7 @@ Then I asked for the README you're probably reading next to this:
 
 ### Round 2: first commit, and he edits (November 2 and 3)
 
-- **Built:** the first commit, `19ee048`. Then an `edit_document` tool: find and replace that matches curly and straight quotes and Docs' odd spaces, refuses when a match isn't unique, reads the doc back to confirm each edit landed, explains failures in plain English, and undoes in reverse. Each reply gets a receipt with Undo. A Chrome extension can't use an MCP server, so edits go through the page: select the passage, paste into Docs' own text box.
+- **Built:** the first commit, `e748ab1`. Then an `edit_document` tool: find and replace that matches curly and straight quotes and Docs' odd spaces, refuses when a match isn't unique, reads the doc back to confirm each edit landed, explains failures in plain English, and undoes in reverse. Each reply gets a receipt with Undo. A Chrome extension can't use an MCP server, so edits go through the page: select the passage, paste into Docs' own text box.
 - **Tested:** a live probe in my Chrome on a scratch Doc. Replace, delete and a two paragraph paste all landed. 146 tests, 20 of them new, against a fake Docs shaped like the live one.
 - **Broke:** `getSelection()` returns an array, and the code expected one object, so selection reads always came back empty. `setSelection` takes two numbers, and the code passed an object, so pastes landed at the end of the doc. Also, the README said "he edits when you ask" before he could.
 - **Fixed:** both selection shapes. Now the README was true.
@@ -89,7 +89,7 @@ I opened it on a real doc:
 - **Built:** round 1 was 9 families of 6 options, 54 in all, each drawn on 5 screens: Win98 faithful, balloon native, margin comments, red pen, docked sidebar, card deck, change ledger, keyboard first, sticky notes. I starred 8, and said they "all still need to have that windowsy Microsoft style look... that yellowish light background, blue header ribbons, gray buttons." Round 2 refined each star into 32 options with that colorway settled. My notes: "Not sure what 'just let me write' or 'close' is, seems useless," and "Clippy for sure always needs to not be in the broader window, I like when he's independent and not embedded into these things," and "Let's start trimming and dialing in, not adding new." Round 3 trimmed the 7 stars: no menus inside his panel, no extra controls, and he always stands outside the window. I picked A1, Classic Dialog, and D2, Ribboned Sheet. Round 4 merged them both ways, and D3 won: D2's speech balloon sheet with its tail pointing at a free standing Clippy, plus A1's notes heading, tally and etched group boxes.
 - **Tested:** D3 built into the extension, then 7 screens rendered side by side against the lab page. 183 tests.
 - **Broke:** the first build run died halfway, leaving 10 files changed and nothing committed.
-- **Fixed:** restarted from where the edits stopped. It closed three gaps against the design, and shipped as `e54f712`.
+- **Fixed:** restarted from where the edits stopped. It closed three gaps against the design, and shipped as `d9f892a`.
 - **Wanted next:** to try it on a real doc.
 
 ### Round 5: close buttons (November 4)
@@ -105,7 +105,7 @@ I opened it on a real doc:
 - **Built:** a pass on everything that runs while you're not looking. Leaving a page and coming back through the back button now pauses him and restores him, with the same hidden or snoozed state, instead of losing him. Settings changes go through the background worker one at a time. More guards around writing into the doc.
 - **Tested:** 249 of 249 tests across 29 files, strict types, both builds, then 15 checks on the built extension in clean Chromium profiles: startup, panel open and close, enable and disable, and settings surviving a popup reopen and a full browser restart.
 - **Broke:** coming back to a page from the back/forward cache could never restore him. The test failed before the fix and passed after. Starting the built extension for real in Chromium also turned up a manifest resource pattern Chrome refused.
-- **Fixed:** both, released as `39e96d6`.
+- **Fixed:** both, released as `3b5c153`.
 
 ### Round 7: the window that wouldn't close (November 5)
 
@@ -115,7 +115,7 @@ I opened it on a real doc:
 - **Fixed:** hidden always wins now. Waiting notes say Waiting. The panel opens with "I read <doc>. Here's what I'd fix." The tally reads as progress. One echo per repeat, and a reading band instead of a grade. I checked it live: "Looks perfect!"
 - **Then the rename:** "We're gonna call it Clippee from here forward, not Mr. Clippy," and "We're also gonna have to do a slight redesign so it doesn't look 100% identical." Every name you see changed. Internal ids stayed, so saved keys, layouts and shortcuts survive.
 - **Also broke that morning:** with no API key, every background draft failed and each failure opened Settings, so four Settings windows piled up. The panel also grew past the bottom of the window as notes filled in. Fixed: no drafting without a key, one line that says Open Settings, one Settings window at most, and the panel placed again whenever its size changes. 257 tests.
-- **And:** "I never tested Word or Notion, not sure why that's in there." When I asked for document editors only, Word for the web and Notion had come along with Google Docs. I only ever tested Docs, so the description and docs claim Docs only now. Then "the open settings button was a bit laggy and buggy" got fixed in `d054980`.
+- **And:** "I never tested Word or Notion, not sure why that's in there." When I asked for document editors only, Word for the web and Notion had come along with Google Docs. I only ever tested Docs, so the description and docs claim Docs only now. Then "the open settings button was a bit laggy and buggy" got fixed in `4b9a33a`.
 
 ### Round 8: chat everywhere (November 5)
 
@@ -127,7 +127,7 @@ I opened it on a real doc:
 
 ### Round 9: logo and palette (November 5)
 
-- **Built, logo:** "I like the 4 squares and colors situation, we need to parody stuff." Microshaft parodies a famous four square logo. Round 1 was 54 options in 9 families. Rounds 2 and 3 narrowed it, and a final put 6 finalists side by side on one screen. After the palette lock, the finalists were recolored to match, and I called the winner with "THIS IS THE ONE." It ships as the toolbar icon in `0b1a173`, with the 16 and 32 pixel sizes tuned by hand so the gaps between the squares stay crisp.
+- **Built, logo:** "I like the 4 squares and colors situation, we need to parody stuff." Microshaft parodies a famous four square logo. Round 1 was 54 options in 9 families. Rounds 2 and 3 narrowed it, and a final put 6 finalists side by side on one screen. After the palette lock, the finalists were recolored to match, and I called the winner with "THIS IS THE ONE." It ships as the toolbar icon in `a5179e0`, with the 16 and 32 pixel sizes tuned by hand so the gaps between the squares stay crisp.
 - **Built, palette:** 6 palettes on the real panel CSS, then a 2 by 2 of my two favorites and their merges. Warmer won: an indigo ribbon, butter cream, taupe bevels and a spruce primary button, a few shades off the Windows 98 values. My note on cohesion: "The logos will have to be recolored also and probably at least one of the tiles need to include our recolor that's chosen for the header banners in the actual UI." So the bulb, error and tick icons in the panel take the logo's yellow, red and a darker green.
 - **Tested:** 280 tests after the palette, and again after the icon.
 - **Where the art stands:** the paperclip on screen was still the original 1997 sprite pack in `src/packs/clippy/` at the end of this round.
@@ -162,21 +162,21 @@ I opened it on a real doc:
 
 | When | What ran | Result | Where |
 |---|---|---|---|
-| Aug 28 | Tests, typecheck, both builds | 126 of 126 | Private note, `19ee048` |
+| Aug 28 | Tests, typecheck, both builds | 126 of 126 | Private note, `e748ab1` |
 | Aug 28 | Local checks at 11,000 words | 63 ms | Private note |
 | Aug 28 | Live read of a doc I own | Read it, first real catch | Private note |
 | Nov 2 | Live probe on a scratch Doc in my Chrome | Replace, delete, paragraph split landed | Private note |
-| Nov 3 | Tests after editing | 146 | `657a803` |
-| Nov 3 | Tests after previews and threads | 167 | `cb3fb8c` |
-| Nov 3 | Tests after D3, plus 7 side by side screens | 183 | `e54f712` |
-| Nov 4 | Tests after the close fix | 185 | Private note, `7b396b1` |
-| Nov 4 | 29 test files, types, both builds, built extension in clean Chromium | 249 of 249, 15 of 15 | `39e96d6`, private release report |
-| Nov 5 | Closed panel bug in real Chromium | Reproduced, fixed. 254 tests | Private note, `f64d086` |
-| Nov 5 | Tests after the no key fix | 257 | Private note, `199046a` |
-| Nov 5 | Tests after chat everywhere and the palette | 280 | Private note, `d870d45`, `5b2e251` |
-| Nov 5 | My run for these docs, at `0b1a173` | 280 of 280 across 33 files, types, both builds | Local run |
+| Nov 3 | Tests after editing | 146 | `86fd866` |
+| Nov 3 | Tests after previews and threads | 167 | `4c41f45` |
+| Nov 3 | Tests after D3, plus 7 side by side screens | 183 | `d9f892a` |
+| Nov 4 | Tests after the close fix | 185 | Private note, `361e852` |
+| Nov 4 | 29 test files, types, both builds, built extension in clean Chromium | 249 of 249, 15 of 15 | `3b5c153`, private release report |
+| Nov 5 | Closed panel bug in real Chromium | Reproduced, fixed. 254 tests | Private note, `108a936` |
+| Nov 5 | Tests after the no key fix | 257 | Private note, `b6fa03c` |
+| Nov 5 | Tests after chat everywhere and the palette | 280 | Private note, `7439b11`, `7e12fd2` |
+| Nov 5 | My run for these docs, at `a5179e0` | 280 of 280 across 33 files, types, both builds | Local run |
 | Nov 5 | `tests/size.bench.test.ts`, same run | 64 ms at 11,040 words | Local run |
-| Nov 5 | My run again, at `2f95b6c` after the new art | 285 of 285 across 34 files, types, both builds; bench 48 ms | Local run |
+| Nov 5 | My run again, at `cc622fd` after the new art | 285 of 285 across 34 files, types, both builds; bench 48 ms | Local run |
 
 There's no CI on this repo yet. Every number above comes from a run on my machine. The fake Docs in the tests is shaped like the live API, and the real Docs gets checked by hand.
 
