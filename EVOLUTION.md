@@ -57,6 +57,7 @@ Then I asked for the README you're probably reading next to this:
 | Nov 5 | v2.1: Undo on each fixed row, a History per doc, the toolbar button calls him back while he's away, the full name in the title bar. 332 tests | `v2.1` |
 | Nov 5 | v2.1.1: X is not a snooze, Settings is just the key and Show / Hide, idles never stall or repeat, a reload never leaves a doc without him. 342 tests | `v2.1.1` |
 | Nov 5 | v2.2: the bug hunt's fixes (never stuck hidden, never off screen), the panel keeps its tail, a new small icon, the boot splash banner. 354 tests | `v2.2` |
+| Nov 5 | v2.2.1: the cut in every icon and the banner is white | `v2.2.1` |
 
 ## 4. Round by round
 
@@ -187,6 +188,7 @@ Then, the same night, v2.1.1:
 - **Owed from 2.1.1:** the no-repeat idle bag was supposed to carry across tabs and reloads. It wasn't hooked up. Now it is.
 - **Picked, a smaller icon:** the option called "1.5x, heavier shaft". The 16 and 32 pixel icons in the toolbar, the panel's title bar and Settings are new, squares snapped to whole pixels and the curves smoothed. The big icons stay as they were.
 - **Picked, a banner:** the boot splash, "this one for sure!" It's at the top of the README: a 1997 boot screen with Clippee waiting at the end of the progress bar.
+- **v2.2.1, white:** "Can we actually keep the dick part white for all of them, same size and shape but white regardless of background, banner as well." Every icon, the title-bar and Settings marks and the banner now cut the same shape out in white.
 - **Tested:** 354 tests, including the bug hunt's own repro of the stranded read, the watchdog, a shrinking window, a drag past the edge and the panel layout. The built extension, in Chromium: dragged past the corner he stayed inside, a window shrunk to 900 by 560 brought him back fully in view, and the panel opened beside him with its tail across three reloads.
 
 ## 5. Feature family tree
