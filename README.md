@@ -116,7 +116,7 @@ His first real catch was in a comic script of mine: “the same man the reader m
 
 **He checks your structure when you ask.** Type “check my structure” and he looks for things your intro promises that the rest of the doc never delivers.
 
-**He never just fades in.** He gets printed out on a dot matrix printer. He installs himself with a setup wizard. He punches through a blue screen, drills up through your page, or gets beamed down by a teleporter. Eleven ways in, eight ways out, shuffled so you won't see a repeat until he's done them all. Click his X and he leaves in style, then comes back on his own 15 minutes later, because that's who he is. Miss him sooner? Click the toolbar button. If your computer is set to reduce motion, he just walks on and off like a normal paperclip.
+**He never just fades in.** He gets printed out on a dot matrix printer. He installs himself with a setup wizard. He punches through a blue screen, drills up through your page, or gets beamed down by a teleporter. Eleven ways in, eight ways out, shuffled so you won't see a repeat until he's done them all. Click his X and he leaves in style, then comes back on his own 5 minutes later, because that's who he is. Miss him sooner? Click the toolbar button. If your computer is set to reduce motion, he just walks on and off like a normal paperclip.
 
 **He looks the part.** A cream speech balloon with an indigo ribbon, beveled buttons, Tahoma and etched group boxes, all a few shades off the Windows 98 originals. He stands on his own next to the panel, never boxed inside it.
 

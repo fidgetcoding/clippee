@@ -53,7 +53,7 @@ Then I asked for the README you're probably reading next to this:
 | Nov 5 | Logo lab, 4 rounds and a final. Microshaft icon shipped | `5864105` |
 | Nov 5 | Clippee's own art: 18 animations redrawn on the 1997 timings, Microsoft's pack removed, Thinking while fixes draft. 285 tests | `9d0d335` |
 | Nov 5 | Tagged v1 | `v1` |
-| Nov 5 | v2: random entrances and exits, he comes back after 15 minutes, hops, Victory, a waddle, the mark in the title bar. 311 tests | `v2` |
+| Nov 5 | v2: random entrances and exits, he comes back after 5 minutes, hops, Victory, a waddle, the mark in the title bar. 311 tests | `v2` |
 
 ## 4. Round by round
 
@@ -149,10 +149,10 @@ I opened it on a real doc:
 - **The ask:** something big every time he appears, and every time he leaves after you click X. "I don't like the basic fade in fade out." Twenty entrance and exit pairs came back in four families: 1997 machines, paperclip physics, cartoon physics and big superhero stuff.
 - **Picked:** 11 entrances and 8 exits. Some only half won. On the blue screen: "I like the entry here, not the exit." On the rubber band: "I like the exit, not the entry." I'd planned on alternating two, then changed my mind: "I guess the entrances and exits will have to be random and just cycle through as the person uses it... more than 2 options like I said last time."
 - **Built, entrances and exits:** every arrival is a random entrance and every departure a random exit, from shuffle bags that remember their place across tabs, so nothing repeats until he's used them all. The effects are the lab's own code, bundled as is and checked frame by frame against the lab. They draw on their own layer: the superhero landing still cracks the ground, but your doc never shakes. Reduce motion on your computer and he walks on and off plain.
-- **Built, coming back:** "He should always reappear again after a certain amount of time as a rule, or you can click the extension button up top." His X sends him off for 15 minutes and keeps tips quiet for exactly that long. The toolbar button brings him back sooner.
+- **Built, coming back:** "He should always reappear again after a certain amount of time as a rule, or you can click the extension button up top." His X sends him off for 5 minutes (15 at first; I cut it to 5) and keeps tips quiet for exactly that long. The toolbar button brings him back sooner.
 - **Built, jumping:** "I think he can jump around a bit more when he's excited, or like penguin waddle in certain situations." Greeting hops while he waves, Congratulate does hops and a pogo bounce, Victory is a waddle after Fix all lands, and a new idle waddles a few steps and back.
 - **Built, logo in context:** the Microshaft mark now sits left of "Clippee" in the panel's title bar and in Settings, like the logo lab showed it.
-- **Tested:** 311 tests, including the pools, the bag never repeating back to back, the 15 minute return, the toolbar summon, the reduced motion path and the new animations pinned by pixel hash. The built extension ran in a clean Chromium against a stand-in Docs page.
+- **Tested:** 311 tests, including the pools, the bag never repeating back to back, the 5 minute return, the toolbar summon, the reduced motion path and the new animations pinned by pixel hash. The built extension ran in a clean Chromium against a stand-in Docs page.
 
 ## 5. Feature family tree
 
@@ -170,7 +170,7 @@ I opened it on a real doc:
    ├─ chat on every screen → the panel runs from plain words
    └─ rename → Microshaft logo lab → Warmer palette → recolored logo → icon
       └─ his own art → Thinking while fixes draft
-         └─ v2: random entrances and exits → back in 15 min → hops, Victory, waddle
+         └─ v2: random entrances and exits → back in 5 min → hops, Victory, waddle
 ```
 
 ## 6. Test log

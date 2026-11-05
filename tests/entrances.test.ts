@@ -182,7 +182,7 @@ describe('arriving and leaving', () => {
     presence.dispose();
   });
 
-  it('comes back on his own 15 minutes after X, with an entrance', async () => {
+  it('comes back on his own 5 minutes after X, with an entrance', async () => {
     vi.useFakeTimers();
     const agent = fakeAgent();
     const player = fakePlayer();
@@ -206,7 +206,7 @@ describe('arriving and leaving', () => {
     presence.dispose();
   });
 
-  it('comes back right away when summoned, and the 15 minute clock stops', async () => {
+  it('comes back right away when summoned, and the 5 minute clock stops', async () => {
     vi.useFakeTimers();
     const agent = fakeAgent();
     const player = fakePlayer();

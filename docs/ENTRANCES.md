@@ -2,7 +2,7 @@
 
 ## Entrances and exits
 
-Every time Clippee arrives he plays a random entrance, and every time he leaves (his X, `Alt+Shift+C`) a random exit. After his X he comes back on his own 15 minutes later; opening the toolbar popup brings him back sooner.
+Every time Clippee arrives he plays a random entrance, and every time he leaves (his X, `Alt+Shift+C`) a random exit. After his X he comes back on his own 5 minutes later; opening the toolbar popup brings him back sooner.
 
 - **The art** is the round 2 animation lab's own code, kept as written in `src/fx/lab/`: the shared kit (`kit/retro.js`, `kit/clippee-rig.js`, `kit/xkit.js`) and one file per effect (`fx/<id>.js`). Each effect is a pure function of time: `appear(ctx, t, stage)` and `disappear(ctx, t, stage)`, `t` from 0 to 1.
 - **The pools** are in `src/fx/pools.ts`. 11 entrances (r1 r5 r4 p2 p1 c1 c4 x1 x2 x3 x4) and 8 exits (r1 r4 p2 p4 c4 x2 x3 x4). Each pool is a shuffle bag: every effect plays once before any repeats, and he never does the same one twice in a row. The bags live in `storage.local` under `mrclippy:fx-bags`, so the rotation carries across tabs and reloads.

@@ -1,7 +1,7 @@
 import type { FxKind, LabFx } from '../fx/types';
 
 /** After X, he comes back on his own. Nate: "he should always reappear again after a certain amount of time". */
-export const RETURN_AFTER_MS = 15 * 60_000;
+export const RETURN_AFTER_MS = 5 * 60_000;
 
 /** The first Greeting frame after he has drawn himself in from a bare wire: the hop and the wave. */
 export const GREETING_WAVE_FRAME = 22;

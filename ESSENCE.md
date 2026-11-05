@@ -9,7 +9,7 @@
 **What's different.**
 
 - He's a character, not a sidebar. He stands on his own next to your doc, animates, and talks in a speech balloon.
-- He makes an entrance. Eleven ways in and eight ways out (a dot matrix printer, a setup wizard, a magnet, a teleporter), shuffled so none repeats until he's used them all. Send him off and he's back in 15 minutes.
+- He makes an entrance. Eleven ways in and eight ways out (a dot matrix printer, a setup wizard, a magnet, a teleporter), shuffled so none repeats until he's used them all. Send him off and he's back in 5 minutes.
 - He knows when to shut up. He waits for 15 seconds of quiet, speaks up on his own at most once every 10 minutes, and a kind of tip you wave off three times never comes back.
 - Nothing in your doc changes until you click. Every fix is a preview with Apply or Skip, every applied fix has Undo, and Undo turns into Redo. Fix all does the lot with one Undo.
 - The fixes are already written when you look. Opening the panel starts drafting them in the background, three at a time after the first one warms Claude's cache.
