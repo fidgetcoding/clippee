@@ -33,6 +33,16 @@
   touch-action: none;
 }
 
+.mrclippy-mark {
+  flex: none;
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin-right: -2px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
 .mrclippy-title {
   flex: 1;
   min-width: 0;

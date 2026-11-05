@@ -1,3 +1,5 @@
+import mark16 from '../icons/icon-16.png?inline';
+import mark32 from '../icons/icon-32.png?inline';
 import { QUICK_ACTIONS, type ChatPanelOptions } from './chatTypes';
 
 /**
@@ -43,6 +45,17 @@ export function buildTitleBar(options: ChatPanelOptions): TitleBar {
   const back = button('< Notes', 'mrclippy-btn-sm mrclippy-back');
   back.hidden = true;
 
+  // The Microshaft mark, as the window icon. The hand-drawn 16 px bitmap, not
+  // the vector: scaled down, the vector blurs its gutters into the tiles.
+  const mark = document.createElement('img');
+  mark.className = 'mrclippy-mark';
+  mark.src = mark16;
+  mark.srcset = `${mark16} 1x, ${mark32} 2x`;
+  mark.width = 16;
+  mark.height = 16;
+  mark.alt = '';
+  mark.draggable = false;
+
   const title = document.createElement('span');
   title.className = 'mrclippy-title';
   title.textContent = 'Clippee';
@@ -58,7 +71,7 @@ export function buildTitleBar(options: ChatPanelOptions): TitleBar {
   close.addEventListener('click', () => options.onClose());
   right.append(settings, close);
 
-  el.append(back, title, right);
+  el.append(mark, back, title, right);
   return { el, back, title, settings, close };
 }
 

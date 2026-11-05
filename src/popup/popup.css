@@ -21,9 +21,18 @@ header {
 }
 
 h1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
   font-size: 16px;
   letter-spacing: -0.01em;
+}
+
+/* The Microshaft mark: the hand-drawn 16 px bitmap, kept crisp. */
+h1 .mark {
+  flex: none;
+  image-rendering: pixelated;
 }
 
 #status {
