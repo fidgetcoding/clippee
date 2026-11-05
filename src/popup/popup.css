@@ -35,6 +35,18 @@ h1 .mark {
   image-rendering: pixelated;
 }
 
+/* The full name on one line: "by Microshaft" a size down and lighter. */
+h1 {
+  white-space: nowrap;
+}
+
+h1 .by {
+  margin-left: -2px;
+  font-size: 13px;
+  font-weight: 400;
+  color: #6f5f45;
+}
+
 #status {
   margin: 3px 0 0;
   font-size: 12px;

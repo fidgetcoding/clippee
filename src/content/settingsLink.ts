@@ -43,6 +43,6 @@ export function askForKey(agent: Agent): void {
         },
       },
     ],
-    'Clippee',
+    'Clippee by Microshaft',
   );
 }
