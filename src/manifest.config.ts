@@ -16,8 +16,9 @@ export default defineManifest({
   version: '2.1.1',
   description: 'The paperclip is back, and this time he read your doc. Notes and one-click fixes for Google Docs.',
 
-  // The Microshaft mark. 16 and 32 are hand-tuned bitmaps; a downscaled vector
-  // blurs the gutters into the tiles at toolbar size.
+  // The Microshaft mark. 16 and 32 are drawn for their size (squares snapped to
+  // whole pixels, the curves smoothed); a downscaled 128 blurs the gutters into
+  // the tiles at toolbar size. 48 and 128 are the full mark.
   icons: {
     16: 'src/icons/icon-16.png',
     32: 'src/icons/icon-32.png',
