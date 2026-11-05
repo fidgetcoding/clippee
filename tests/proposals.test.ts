@@ -206,7 +206,7 @@ describe('one fix at a time', () => {
 
     // Back on the notes, both rows read Applied and the tally says so.
     p.el.querySelector<HTMLButtonElement>('.mrclippy-back')?.click();
-    expect(p.el.querySelector('.mrclippy-tally')?.textContent).toBe('2 applied');
+    expect(p.el.querySelector('.mrclippy-tally')?.textContent).toBe('2 of 2 applied');
   });
 
   it('a question asked from the list opens its own chat, listed for later', async () => {

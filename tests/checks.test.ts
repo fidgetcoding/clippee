@@ -4,7 +4,7 @@ import { assess, collectStats, score } from '../src/checks/readability';
 import { analyseParagraphs, analyseRhythm, repeatedOpeners } from '../src/checks/rhythm';
 import { paragraphs, sentences, syllables, words } from '../src/checks/segment';
 import { analyseAdverbs, findPassive, findStyleIssues, findThereIs, findWordy } from '../src/checks/style';
-import { review } from '../src/checks';
+import { readingLevel, review, styleNoteText } from '../src/checks';
 import { Relevance } from '../src/scheduler/types';
 
 describe('segmentation', () => {
@@ -82,6 +82,17 @@ describe('echo detection', () => {
 
     // "the quick brown fox jumps" should win over "the quick brown".
     expect(echoes[0]!.wordCount).toBeGreaterThanOrEqual(5);
+  });
+
+  it('reports a repeat longer than the window once, not as shifted copies', () => {
+    // From a live doc: a 9-word repeat came back as two 8-word echoes,
+    // "a comparative … form" and "comparative … form in".
+    const phrase = 'a comparative analytical study of sonata allegro form in';
+    const text = `My essay is ${phrase} dubstep. Next comes ${phrase} classical music.`;
+    const echoes = findEchoes(text);
+
+    expect(echoes).toHaveLength(1);
+    expect(echoes[0]!.phrase).toBe('a comparative analytical study of sonata allegro form');
   });
 
   it('ignores repeats that are far apart', () => {
@@ -196,6 +207,18 @@ describe('review', () => {
 
     const confidences = review(messy).map((f) => f.confidence);
     expect([...confidences].sort((a, b) => b - a)).toEqual(confidences);
+  });
+
+  it('names a reading band instead of a grade nobody recognises', () => {
+    expect(readingLevel(48)).toBe('harder than college level');
+    expect(readingLevel(14)).toBe('college reading level');
+    expect(readingLevel(11)).toBe('about a grade 11 reading level');
+  });
+
+  it('does not repeat a quote the note already carries', () => {
+    expect(styleNoteText('"the majority of" → "most"', 'The majority of', 1)).toBe('"the majority of" → "most"');
+    expect(styleNoteText('"the majority of" → "most"', 'the majority of', 3)).toBe('"the majority of" → "most" — and 2 more');
+    expect(styleNoteText('Hedge — cut it.', 'I believe', 1)).toBe('Hedge — cut it. ("I believe")');
   });
 
   it('collapses many instances of one rule into a single suggestion', () => {

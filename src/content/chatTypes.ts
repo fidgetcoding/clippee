@@ -184,7 +184,11 @@ export function noteLabel(finding: PanelFinding): { label?: string; body: string
     label = lead[1];
     body = body.slice(lead[0].length);
   }
-  body = body.replace(/\s+—\s+(\d+ instances)/, ' $1');
+  body = body
+    .replace(/\s+—\s+(\d+ instances)/, ' $1')
+    .replace(/\s+—\s+(and \d+ more)/, ', $1');
+  // "Hedge — the sentence is…" loses its label; the rest starts a sentence.
+  if (label && body) body = body.charAt(0).toUpperCase() + body.slice(1);
   return label ? { label, body } : { body };
 }
 
@@ -199,17 +203,28 @@ export function fixTitle(finding: PanelFinding): string {
   return label ? `${label}. ${body}` : body;
 }
 
-/** "3 ready, 1 drafting, 1 applied, 1 failed". Empty kinds are left out. */
+/**
+ * Where the fixes stand, in plain words: "Writing fixes: 3 of 7 done" while any
+ * are waiting or being written, then "All 7 fixes are written", then "2 of 7
+ * applied". `undefined` is a fix still waiting its turn. Empty when no fix has
+ * been asked for.
+ */
 export function tallyLine(states: readonly (ThreadState | undefined)[]): string {
+  if (states.every((s) => s === undefined)) return '';
+  const total = states.length;
   const count = (k: ThreadState['kind']): number => states.filter((s) => s?.kind === k).length;
-  const parts: [number, string][] = [
-    [count('ready'), 'ready'],
-    [count('working'), 'drafting'],
-    [count('applied'), 'applied'],
-    [count('failed'), 'failed'],
-  ];
-  return parts
-    .filter(([n]) => n > 0)
-    .map(([n, word]) => `${n} ${word}`)
-    .join(', ');
+  const pending = states.filter((s) => s === undefined || s.kind === 'working').length;
+  const failed = count('failed');
+  const applied = count('applied');
+  const head =
+    pending > 0
+      ? `Writing fixes: ${total - pending} of ${total} done`
+      : applied > 0
+        ? `${applied} of ${total} applied`
+        : failed > 0
+          ? `${total - failed} of ${total} fixes written`
+          : total === 1
+            ? 'The fix is written'
+            : `All ${total} fixes are written`;
+  return failed > 0 ? `${head}, ${failed} failed` : head;
 }

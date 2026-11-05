@@ -102,13 +102,15 @@ export function findEchoes(text: string, options: EchoOptions = {}): Echo[] {
 }
 
 /**
- * True when a longer echo already reported covers these positions — a substring
- * of an existing finding, occurring at the same places.
+ * True when an echo already reported covers these positions: a substring of an
+ * existing finding, or a same-length window shifted along it. A repeat longer
+ * than `maxWords` shows up as several overlapping windows ("a comparative …
+ * form" and "comparative … form in"), and they are one echo, not two.
  */
 function isCoveredBy(found: readonly Echo[], positions: readonly number[], wordCount: number): boolean {
   return found.some(
     (existing) =>
-      existing.wordCount > wordCount &&
+      existing.wordCount >= wordCount &&
       positions.every((pos) =>
         existing.positions.some((known) => Math.abs(known - pos) <= existing.wordCount * 12),
       ),

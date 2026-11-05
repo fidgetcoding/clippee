@@ -337,7 +337,7 @@ export function fixAllBar(
       const threads = fixable.map((ensure) => ensure().thread);
       let ready = 0;
       const progress = (): void => {
-        hint.textContent = `Drafting… ${ready} of ${threads.length} ready.`;
+        hint.textContent = `Writing fixes: ${ready} of ${threads.length} done.`;
       };
       progress();
       await Promise.all(

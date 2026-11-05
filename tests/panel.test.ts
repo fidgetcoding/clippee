@@ -75,13 +75,15 @@ describe('notes heading', () => {
       docTitle: 'Copy of Annotated Bibliography',
     });
     expect(p.el.querySelector('.mrclippy-big')?.textContent).toBe('2 notes');
-    expect(p.el.querySelector('.mrclippy-sub')?.textContent).toContain('on Copy of Annotated Bibliography');
+    expect(p.el.querySelector('.mrclippy-sub')?.textContent).toContain(
+      'I read Copy of Annotated Bibliography. Here\u2019s what I\u2019d fix.',
+    );
   });
 
-  it('leaves the document line out when the title is unknown', () => {
+  it('says "your doc" when the title is unknown', () => {
     const p = panel({ findings: [{ text: 'A' }] });
     expect(p.el.querySelector('.mrclippy-big')?.textContent).toBe('1 note');
-    expect(p.el.querySelector('.mrclippy-sub')?.textContent).not.toContain('on ');
+    expect(p.el.querySelector('.mrclippy-sub')?.textContent).toContain('I read your doc. Here\u2019s what I\u2019d fix.');
   });
 
   it('strips the Google Docs suffix from the tab title', () => {
@@ -93,7 +95,11 @@ describe('notes heading', () => {
   it('lifts the label out of a style note and keeps the count', () => {
     expect(
       noteLabel({ text: 'Hedge — the sentence is stronger without it. — 3 instances, first: "I believe"', kind: 'hedging' }),
-    ).toEqual({ label: 'Hedge', body: 'the sentence is stronger without it. 3 instances, first: "I believe"' });
+    ).toEqual({ label: 'Hedge', body: 'The sentence is stronger without it. 3 instances, first: "I believe"' });
+    expect(noteLabel({ text: '"the majority of" → "most" — and 2 more', kind: 'wordiness' })).toEqual({
+      label: 'Wordy',
+      body: '"the majority of" → "most", and 2 more',
+    });
     expect(noteLabel({ text: 'Paragraph 8 is long.', kind: 'paragraph-balance' })).toEqual({
       label: 'Long paragraph',
       body: 'Paragraph 8 is long.',
@@ -112,9 +118,32 @@ describe('tally line', () => {
         { kind: 'applied' },
         { kind: 'failed' },
       ]),
-    ).toBe('3 ready, 1 drafting, 1 applied, 1 failed');
-    expect(tallyLine([{ kind: 'working' }, undefined])).toBe('1 drafting');
+    ).toBe('Writing fixes: 5 of 6 done, 1 failed');
+    expect(tallyLine([{ kind: 'working' }, undefined])).toBe('Writing fixes: 0 of 2 done');
+    expect(tallyLine([{ kind: 'ready', count: 1 }, { kind: 'ready', count: 2 }])).toBe('All 2 fixes are written');
+    expect(tallyLine([{ kind: 'applied' }, { kind: 'ready', count: 1 }])).toBe('1 of 2 applied');
     expect(tallyLine([undefined])).toBe('');
+  });
+
+  it('shows notes still in line as Waiting, not as a ready fix', () => {
+    // From a live doc: queued notes showed the "fix ready" bulb, a blank
+    // status and a lone Review button, which read as broken.
+    const p = panel({
+      findings: [
+        { text: 'A', anchor: 'one' },
+        { text: 'B', anchor: 'two' },
+      ],
+      canEdit: true,
+      prefetch: true,
+      onAsk: () => new Promise(() => {}),
+    });
+    const second = p.el.querySelectorAll<HTMLElement>('.mrclippy-nr')[1];
+    expect(second?.querySelector('.mrclippy-nr-st')?.textContent).toBe('Waiting');
+    expect(second?.querySelector('.mrclippy-ic-glass')).not.toBeNull();
+    expect(second?.querySelector('.mrclippy-ic-bulb')).toBeNull();
+    expect(second?.querySelector<HTMLButtonElement>('.mrclippy-review')?.hidden).toBe(true);
+    expect(p.el.querySelector('.mrclippy-lvh')?.textContent).toBe('NoteFix');
+    p.dispose();
   });
 
   it('follows the real threads: drafting, then ready, then failed', async () => {
@@ -133,9 +162,9 @@ describe('tally line', () => {
       },
     });
     const tally = () => p.el.querySelector('.mrclippy-tally')?.textContent;
-    expect(tally()).toBe('1 drafting');
+    expect(tally()).toBe('Writing fixes: 0 of 2 done');
     for (let i = 0; i < 6; i++) await flush();
-    expect(tally()).toBe('1 ready, 1 failed');
+    expect(tally()).toBe('1 of 2 fixes written, 1 failed');
     const failed = p.el.querySelector('.mrclippy-nr[data-state="failed"]');
     expect(failed?.querySelector('.mrclippy-nr-st')?.textContent).toBe('Failed');
     expect(failed?.textContent).toContain('Not done. Claude could not reach the server.');

@@ -105,8 +105,10 @@
   box-sizing: border-box;
 }
 
+/* Important because sheets set `display: flex` later in this file. Without it
+   a closed panel stayed on screen, unsized and unpinned, with a dead X. */
 .mrclippy-balloon[hidden] {
-  display: none;
+  display: none !important;
 }
 
 .mrclippy-balloon-content {

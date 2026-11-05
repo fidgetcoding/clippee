@@ -38,6 +38,8 @@ export class NotesView {
   private readonly groups: HTMLElement;
   private questions: HTMLElement | undefined;
   private readonly states = new Map<HTMLElement, ThreadState | undefined>();
+  /** Rows whose fix is drafted in the background, so "not started" means waiting. */
+  private readonly queued = new Set<HTMLElement>();
 
   constructor(
     findings: number,
@@ -53,13 +55,17 @@ export class NotesView {
     this.big.className = 'mrclippy-big';
     const sub = document.createElement('div');
     sub.className = 'mrclippy-sub';
+    // What this window is, in his words, so nobody has to work it out.
+    const line = document.createElement('div');
     if (docTitle) {
-      const on = document.createElement('div');
       const b = document.createElement('b');
       b.textContent = docTitle;
-      on.append('on ', b);
-      sub.appendChild(on);
+      line.append('I read ', b);
+    } else {
+      line.append('I read your doc');
     }
+    line.append(findings > 0 ? '. Here’s what I’d fix.' : '.');
+    sub.appendChild(line);
     this.tally = document.createElement('div');
     this.tally.className = 'mrclippy-tally';
     sub.appendChild(this.tally);
@@ -80,7 +86,7 @@ export class NotesView {
       box.classList.add('mrclippy-notes-group');
       const head = document.createElement('div');
       head.className = 'mrclippy-lvh';
-      for (const t of ['Note', 'Status']) {
+      for (const t of ['Note', 'Fix']) {
         const s = document.createElement('span');
         s.textContent = t;
         head.appendChild(s);
@@ -146,10 +152,12 @@ export class NotesView {
       handlers.dismiss();
       row.remove();
       this.states.delete(row);
+      this.queued.delete(row);
       this.refresh();
     });
 
     row.append(ic, tx, st, ac, ignore);
+    if (fix?.label === 'Review') this.queued.add(row);
     this.well?.appendChild(row);
 
     const draw = (state: ThreadState | undefined): void => {
@@ -157,8 +165,10 @@ export class NotesView {
       row.dataset.state = kind;
       if (kind === 'applied') row.dataset.fixed = '';
       else delete row.dataset.fixed;
+      // Queued for background drafting: nothing is written yet, so no bulb.
+      const waiting = kind === 'idle' && fix?.label === 'Review';
       ic.replaceChildren(
-        kind === 'working'
+        kind === 'working' || waiting
           ? statusIcon('glass')
           : kind === 'applied'
             ? statusIcon('ok')
@@ -166,13 +176,17 @@ export class NotesView {
               ? statusIcon('err')
               : kind === 'answered' || kind === 'skipped'
                 ? bullet(true)
-                : statusIcon('bulb'),
+                : kind === 'ready'
+                  ? statusIcon('bulb')
+                  : bullet(),
       );
       st.textContent =
         state?.kind === 'ready'
           ? `${state.count} change${state.count === 1 ? '' : 's'}`
           : kind === 'working'
-            ? 'Drafting…'
+            ? 'Writing…'
+            : waiting
+              ? 'Waiting'
             : kind === 'applied'
               ? 'Applied'
               : kind === 'failed'
@@ -183,7 +197,7 @@ export class NotesView {
                     ? 'Skipped'
                     : '';
       apply.hidden = kind !== 'ready';
-      review.hidden = !fix || kind === 'working' || kind === 'applied' || kind === 'failed';
+      review.hidden = !fix || waiting || kind === 'working' || kind === 'applied' || kind === 'failed';
       retry.hidden = kind !== 'failed';
       bar.hidden = kind !== 'working';
       ignore.hidden = kind === 'applied' || kind === 'working';
@@ -258,7 +272,9 @@ export class NotesView {
   private refresh(): void {
     const notes = this.states.size;
     this.big.textContent = notes === 0 ? 'No notes' : `${notes} note${notes === 1 ? '' : 's'}`;
-    this.tally.textContent = tallyLine([...this.states.values()]);
+    this.tally.textContent = tallyLine(
+      [...this.states].filter(([row, state]) => state !== undefined || this.queued.has(row)).map(([, state]) => state),
+    );
     this.tally.hidden = this.tally.textContent === '';
     const fixed = this.el.querySelectorAll('[data-fixed]').length;
     this.hideToggle?.setLabel(`Hide fixed (${fixed})`);

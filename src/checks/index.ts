@@ -71,7 +71,7 @@ export function review(text: string, options: ReviewOptions = {}): SuggestionReq
         kind: 'readability',
         relevance: Relevance.Document,
         confidence: 0.5 + readability.votesHarder * 0.07,
-        text: `Hardest sentence to read: ${worst.words} words, about grade ${worst.grade}. Splitting it would help most.`,
+        text: `Hardest sentence to read: ${worst.words} words, ${readingLevel(worst.grade)}. Splitting it would help most.`,
         ...anchorOf(clipAnchor(worst.text)),
         payload: readability,
       });
@@ -108,10 +108,7 @@ export function review(text: string, options: ReviewOptions = {}): SuggestionReq
       kind: rule,
       relevance: Relevance.Sentence,
       confidence: first.confidence,
-      text:
-        findings.length === 1
-          ? `${first.message} ("${first.match}")`
-          : `${first.message} — ${findings.length} instances, first: "${first.match}"`,
+      text: styleNoteText(first.message, first.match, findings.length),
       dedupeKey: rule,
       ...anchorOf(trimmed.slice(first.start, first.end)),
       payload: findings,
@@ -138,6 +135,28 @@ export function hardestSentence(
     if (!best || grade > best.grade) best = { text: sentence.text, words: list.length, grade };
   }
   return best;
+}
+
+/**
+ * A grade number past high school means nothing to a reader ("grade 48" is a
+ * 115-word sentence, not a level anyone recognises), so name the band instead.
+ */
+export function readingLevel(grade: number): string {
+  if (grade > 16) return 'harder than college level';
+  if (grade > 12) return 'college reading level';
+  return `about a grade ${grade} reading level`;
+}
+
+/**
+ * One note for every hit of a style rule. The quote is left off when the
+ * message already carries it (Wordy's "x" → "y"), so it is not said twice.
+ */
+export function styleNoteText(message: string, match: string, count: number): string {
+  const quoted = message.toLowerCase().includes(`"${match.toLowerCase()}"`);
+  if (count === 1) return quoted ? message : `${message} ("${match}")`;
+  return quoted
+    ? `${message} — and ${count - 1} more`
+    : `${message} — ${count} instances, first: "${match}"`;
 }
 
 /** Spread-friendly: omit the key entirely when there is nothing to point at. */
