@@ -1,3 +1,5 @@
+![Clippee by Microshaft: a 1997-style boot splash, Clippee waiting at the end of the progress bar](docs/banner.png)
+
 # Clippee by Microshaft
 
 **The paperclip is back, and this time he read your doc. Notes and one-click fixes for Google Docs.**
