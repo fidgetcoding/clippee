@@ -134,10 +134,10 @@ I opened it on a real doc:
 
 ### Round 10: his own paperclip (November 5)
 
-- **Built, character:** "It needs to be REALLY close, different enough but similar." Seven lab rounds. Round 1 was 24 looks; later rounds tried a shaft and balls body, then pupils shaped like the Microshaft logo, then the same pupils in black on white. My call after round 6: "tbh give him regular eyes like clippy had before we added the penis." The winner is round 3's N1 body with round 2's regular eyes, heavy brows and a 1997 pre-rendered look.
+- **Built, character:** "It needs to be REALLY close, different enough but similar." Seven lab rounds, starting from 24 looks. Later rounds pushed the Microshaft joke into his body and his pupils, then pulled it back out. My call after round 6: give him regular eyes like Clippy had. The winner is round 3's N1 body with round 2's regular eyes, heavy brows and a 1997 pre-rendered look.
 - **Built, animations:** all 18 the extension plays, redrawn on the original frame counts, durations, branches and exit paths, so every trigger works as before. Show, Hide and GetAttention used to zoom; ours never change his size, because I don't like a character that resizes. My verdict: "love all the clippy stuff."
 - **Built, Thinking:** he now plays Thinking while fixes are being written, and winds it down when the last draft lands.
-- **Removed:** Microsoft's sprite pack. Old settings that still name it fall back to Clippee.
+- **Removed:** Microsoft's sprite pack. Clippee started out wearing their 1997 sprite sheet because I was trying to evolve their paperclip, not invent a new one, and every round above ran on it. Once he had art of his own, I took their files out of the repo and out of its history before going public. What's left is the evolution. Old settings that still name the pack fall back to Clippee.
 - **Tested:** 285 tests, including a check that the pack has every animation the code plays by name and that every frame points inside the sprite sheet.
 
 ## 5. Feature family tree
