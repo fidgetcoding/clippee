@@ -185,6 +185,41 @@ export class Agent {
   }
 
   /**
+   * Queue a holding animation that runs until `until` settles, then winds down
+   * along its exit branches. Thinking loops forever on its own; this ends it.
+   * If `until` settles before the animation's turn comes, it is skipped.
+   */
+  playUntil(name: string, until: Promise<unknown>): Promise<void> {
+    let settled = false;
+    const windDown = (): void => {
+      settled = true;
+      if (this.animator.currentAnimationName === name) this.animator.exit();
+    };
+    until.then(windDown, windDown);
+    return new Promise((resolve) => {
+      if (this.destroyed || !this.animator.has(name)) {
+        resolve();
+        return;
+      }
+      this.idle.cancel();
+      this.queue.push((done) => {
+        const finish = (): void => {
+          done();
+          resolve();
+        };
+        if (settled) {
+          finish();
+          return;
+        }
+        const started = this.animator.play(name, (_n, state) => {
+          if (state === AnimatorState.Exited) finish();
+        });
+        if (!started) finish();
+      }, resolve);
+    });
+  }
+
+  /**
    * A one-line nudge that invites a click, played once when he first appears.
    * Without it he is a decoration nobody realises is interactive.
    */

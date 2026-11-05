@@ -201,7 +201,24 @@ async function mountRuntime(
     const canEdit = source.canEdit();
     const build = () => askAgentUncached(question, history, document_, canEdit, panel);
     // A typed request depends on what the panel shows, so it is never a cached draft.
-    return history.length > 0 || panel ? build() : drafts.get(document_, canEdit, question, build);
+    return history.length > 0 || panel
+      ? build()
+      : drafts.get(document_, canEdit, question, () => thinkWhile(build()));
+  }
+
+  /** Fix drafts in flight. He thinks while any are being written. */
+  let drafting = 0;
+  let draftsDone: (() => void) | undefined;
+
+  function thinkWhile<T>(work: Promise<T>): Promise<T> {
+    if (drafting++ === 0) {
+      void agent.playUntil('Thinking', new Promise<void>((resolve) => { draftsDone = resolve; }));
+    }
+    const settle = (): void => {
+      if (--drafting === 0) draftsDone?.();
+    };
+    work.then(settle, settle);
+    return work;
   }
 
   /** Send a question to the background worker, which owns the API key. */

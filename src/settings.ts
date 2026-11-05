@@ -48,7 +48,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = {
   disabledHosts: [],
   soundEnabled: false,
   debugMode: false,
-  characterPack: 'clippy',
+  characterPack: 'clippee',
   apiKey: '',
   workspaceId: '',
 };

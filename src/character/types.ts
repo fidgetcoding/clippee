@@ -3,9 +3,9 @@
  *
  * This is the data shape used by clippy.js (MIT). The shape is adopted
  * deliberately: it is a proven sprite-sheet + branching-animation format, and an
- * idea rather than a copyrightable asset. The Clippy *artwork* that ships in
- * `src/packs/clippy/` is Microsoft's and is not licensed — fine for a personal
- * build, swap for original art before any public release.
+ * idea rather than a copyrightable asset. The artwork that ships in
+ * `src/packs/clippee/` is original, drawn for this project on the same frame
+ * timings and branches, so every animation still triggers and exits as before.
  */
 
 /** Top-left pixel coordinate of a frame within the sprite sheet. */

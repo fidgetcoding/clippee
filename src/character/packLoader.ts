@@ -3,12 +3,11 @@ import type { LoadedPack, Pack } from './types';
 /**
  * Character packs are data, not code.
  *
- * The split matters legally as well as architecturally: the engine in this
- * directory is ours, and the artwork in `src/packs/clippy/` is Microsoft's. A
- * public build ships an original pack and lets the user side-load Clippy, which
- * is only cheap if packs were always loaded rather than imported.
+ * The engine in this directory is clippy.js's, ported; the artwork in
+ * `src/packs/clippee/` is original. Anyone can side-load another character,
+ * which is only cheap because packs were always loaded rather than imported.
  */
-export const DEFAULT_PACK = 'clippy';
+export const DEFAULT_PACK = 'clippee';
 
 function assertPack(value: unknown, name: string): asserts value is Pack {
   const pack = value as Partial<Pack> | null;
@@ -33,6 +32,17 @@ function resourceUrl(path: string): string {
 }
 
 export async function loadPack(name: string = DEFAULT_PACK): Promise<LoadedPack> {
+  try {
+    return await fetchPack(name);
+  } catch (error) {
+    // Settings saved before Clippee had his own art still name 'clippy', which
+    // no longer ships. Fall back rather than leave the page without him.
+    if (name === DEFAULT_PACK) throw error;
+    return fetchPack(DEFAULT_PACK);
+  }
+}
+
+async function fetchPack(name: string): Promise<LoadedPack> {
   const base = `src/packs/${name}`;
   const response = await fetch(resourceUrl(`${base}/pack.json`));
   if (!response.ok) {

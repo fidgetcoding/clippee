@@ -33,5 +33,5 @@ Load `dist/` at `chrome://extensions` with Developer mode on, paste your key int
 - The local checks read an 11,040 word document in 64 ms (`tests/size.bench.test.ts`, same run).
 - The release commit `39e96d6` passed 249 tests plus 15 checks on the built extension in clean Chromium profiles: startup, panel open and close, enable and disable, and settings that survive a full browser restart.
 - In my own Chrome on my own Google Docs: reading a real doc (his first catch was a phrase I'd written twice in a comic script), replacing, deleting and splitting text through the page, and the preview, Apply and Undo flow.
-- The character on screen is still the original 1997 sprite pack in `src/packs/clippy/`, which the MIT license doesn't cover. See [NOTICE.md](NOTICE.md).
+- The character on screen is Clippee's own art in `src/packs/clippee/`: all 18 animations the extension plays, redrawn on the 1997 timings. Microsoft's sprite pack is gone. See [NOTICE.md](NOTICE.md).
 - Running the panel from plain words passes its tests but hasn't had much real use against the live API yet. Firefox builds, but I test in Chrome.

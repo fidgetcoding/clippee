@@ -38,7 +38,7 @@ it('coerces corrupt preferences without trusting synced secrets or pack paths', 
     disabledHosts: [123, 'docs.google.com'], apiKey: 'legacy-secret',
   } });
   expect(await settings.loadPreferences()).toMatchObject({
-    enabled: true, muted: false, snoozeUntil: 0, characterPack: 'clippy',
+    enabled: true, muted: false, snoozeUntil: 0, characterPack: 'clippee',
     disabledHosts: ['docs.google.com'], apiKey: '',
   });
 });

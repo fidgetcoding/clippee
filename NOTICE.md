@@ -29,19 +29,15 @@ same data shape.
 
 The clippy.js license explicitly covers its code only.
 
-## Character artwork — NOT licensed
+## Character artwork
 
-`src/packs/clippy/map.png` and `src/packs/clippy/pack.json` contain the Clippit
-sprite sheet and animation timings. **These are Microsoft's property and no
-licence to them is granted by anyone**, including clippy.js, whose own licence
-states this in as many words.
+`src/packs/clippee/map.png` is original artwork drawn for this project. It is
+not the Clippit sprite sheet and contains no Microsoft artwork.
 
-The character was designed by **Kevan Atteberry**.
-
-This repository is a personal, non-distributed tool, which is why the pack is
-present. Character packs are loaded as data at runtime rather than imported, so a
-public build ships an original character and lets a user side-load this one. Any
-public or commercial release must not bundle this directory.
+So that the clippy.js engine plays him the same way, `src/packs/clippee/pack.json`
+keeps the frame counts, frame durations, branches and exit paths of the 1997
+animations it replaces; every picture those frames point at is new. The 1997
+character was designed by **Kevan Atteberry**.
 
 The speech balloon is authored CSS in `src/content/styles.css` and contains no
 Microsoft artwork.

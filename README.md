@@ -42,7 +42,7 @@ What the letter costs me: one rename. What the same reach costs in ads: more tha
 
 A cease and desist is the only marketing a trillion dollar company will ever do for me for free. It arrives on letterhead. Someone with a law degree had to read my README to write it. That’s more engagement than most of my posts get.
 
-And yes, that’s the real Clippy. Same sprite sheet. Same 43 animations. Same eyebrows. The art belongs to Microsoft (drawn by Kevan Atteberry, who deserves all of the credit and none of this), and nobody gave me permission to use it. I checked. Nobody gave anyone permission. Clippy has been living on the internet unlicensed since 1997, and it’s the most fun he’s ever had.
+And no, that isn’t Clippy. Look closer. That’s Clippee. Heavier eyebrows. Rounder head. A bottom loop that, if you squint, explains the name Microshaft. All 18 of his animations are redrawn from scratch on the original 1997 timings, so he blinks where Clippy blinked and knocks on the glass where Clippy knocked. The resemblance is the point. It took seven rounds to get exactly this close.
 
 Microsoft retired him in 2001 and spent the next 25 years putting him in jokes, stickers, and Teams backgrounds. They know he’s better than they let him be. I’m just finishing the job.
 
@@ -98,7 +98,7 @@ Then hit the reload arrow on his card at `chrome://extensions` and reload your D
 
 **Firefox:** run `npm run build:firefox`, go to `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and pick `dist-firefox/manifest.json`. Firefox forgets temporary add-ons when it restarts. The Firefox build compiles, but I do all my testing in Chrome, so treat Firefox as untried.
 
-**Bring your own paperclip.** Characters load as data from `src/packs/<name>/`: a sprite sheet (`map.png`) and a timing file (`pack.json`), in the same format clippy.js uses. Draw your own, or bring one you have the rights to.
+**Bring your own paperclip.** Characters load as data from `src/packs/<name>/`: a sprite sheet (`map.png`) and a timing file (`pack.json`), in the same format clippy.js uses. Clippee lives in `src/packs/clippee/`. Draw your own, or bring one you have the rights to.
 
 ## What he actually does
 
@@ -156,10 +156,10 @@ Edits go through the page, not the Docs API. He selects the passage, pastes the 
 
 - [clippy.js](https://github.com/clippyjs/clippy.js) (MIT): the animation engine, ported to TypeScript without jQuery.
 - [Harper](https://github.com/Automattic/harper) (Apache 2.0): the approach for reading Google Docs.
-- Kevan Atteberry: the original paperclip. Legend.
+- Kevan Atteberry: the original 1997 paperclip, which Clippee is shamelessly in awe of. Legend.
 
 Full notices in [NOTICE.md](NOTICE.md).
 
 ## License
 
-The code is MIT © Nate Davidovich. The paperclip in `src/packs/clippy/` is Microsoft’s, and the MIT license doesn’t cover it. The code is mine to give away. The paperclip never was.
+The code is MIT © Nate Davidovich, and so is Clippee. The old paperclip was never mine to give away. This one is.

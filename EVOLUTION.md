@@ -129,7 +129,15 @@ I opened it on a real doc:
 - **Built, logo:** "I like the 4 squares and colors situation, we need to parody stuff." Microshaft parodies a famous four square logo. Round 1 was 54 options in 9 families. Rounds 2 and 3 narrowed it, and a final put 6 finalists side by side on one screen. After the palette lock, the finalists were recolored to match, and I called the winner with "THIS IS THE ONE." It ships as the toolbar icon in `0b1a173`, with the 16 and 32 pixel sizes tuned by hand so the gaps between the squares stay crisp.
 - **Built, palette:** 6 palettes on the real panel CSS, then a 2 by 2 of my two favorites and their merges. Warmer won: an indigo ribbon, butter cream, taupe bevels and a spruce primary button, a few shades off the Windows 98 values. My note on cohesion: "The logos will have to be recolored also and probably at least one of the tiles need to include our recolor that's chosen for the header banners in the actual UI." So the bulb, error and tick icons in the panel take the logo's yellow, red and a darker green.
 - **Tested:** 280 tests after the palette, and again after the icon.
-- **Where the art stands:** the paperclip on screen is still the original 1997 sprite pack in `src/packs/clippy/`.
+- **Where the art stands:** the paperclip on screen was still the original 1997 sprite pack in `src/packs/clippy/` at the end of this round.
+
+### Round 10: his own paperclip (November 5)
+
+- **Built, character:** "It needs to be REALLY close, different enough but similar." Seven lab rounds. Round 1 was 24 looks; later rounds tried a shaft and balls body, then pupils shaped like the Microshaft logo, then the same pupils in black on white. My call after round 6: "tbh give him regular eyes like clippy had before we added the penis." The winner is round 3's N1 body with round 2's regular eyes, heavy brows and a 1997 pre-rendered look.
+- **Built, animations:** all 18 the extension plays, redrawn on the original frame counts, durations, branches and exit paths, so every trigger works as before. Show, Hide and GetAttention used to zoom; ours never change his size, because I don't like a character that resizes. My verdict: "love all the clippy stuff."
+- **Built, Thinking:** he now plays Thinking while fixes are being written, and winds it down when the last draft lands.
+- **Removed:** Microsoft's sprite pack. Old settings that still name it fall back to Clippee.
+- **Tested:** 285 tests, including a check that the pack has every animation the code plays by name and that every frame points inside the sprite sheet.
 
 ## 5. Feature family tree
 
