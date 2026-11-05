@@ -33,7 +33,7 @@ Load `dist/` at `chrome://extensions` with Developer mode on, paste your key int
 
 **What works today.**
 
-- 342 of 342 tests pass across 40 files at `v2.1.1`, with strict types and both the Chromium and Firefox builds. That's my own run on November 5, 2026. There's no CI on this repo yet.
+- 354 of 354 tests pass across 42 files at `v2.2`, with strict types and both the Chromium and Firefox builds. That's my own run on November 5, 2026. There's no CI on this repo yet.
 - The built v2 extension, loaded into a clean Chromium against a stand-in Docs page, played three random entrances and three random exits and came back when summoned. The bundled effects match the animation lab pixel for pixel (504 of 504 frames checked).
 - The built v2.1 extension, on a stand-in Docs page that really takes edits, applied a fix, undid and redid it from its row, kept the History through a reload, undid from the History after the reload, and with him away the toolbar button had no popup and called him back.
 - The local checks read an 11,040 word document in 48 to 64 ms across my runs (`tests/size.bench.test.ts`).

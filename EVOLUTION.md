@@ -6,7 +6,7 @@ My words are quoted as I wrote them, typos fixed, nothing else. Commit hashes ar
 
 I wrote the idea down on August 27, 2026, researched it in 11 lanes, specced it in 21 decisions, and had a working Chrome and Firefox extension at 126 passing tests the next day. Then it sat on my machine, uncommitted, for two months.
 
-The real build happened November 2 to 5. In four days he learned to edit Google Docs, show every fix as a preview, write fixes before you ask and run his own panel from plain words. His panel came out of a design lab that opened with 54 options. He was called Mr. Clippy for most of that. On November 5 he became Clippee by Microshaft, with a logo, a palette and art of his own, and that night he became v2: entrances, exits, and more jumping. Then v2.1: a History and Undo on every fixed row, and a Settings that is just the key and a Show / Hide button. The repo went from 126 tests to 342.
+The real build happened November 2 to 5. In four days he learned to edit Google Docs, show every fix as a preview, write fixes before you ask and run his own panel from plain words. His panel came out of a design lab that opened with 54 options. He was called Mr. Clippy for most of that. On November 5 he became Clippee by Microshaft, with a logo, a palette and art of his own, and that night he became v2: entrances, exits, and more jumping. Then v2.1: a History and Undo on every fixed row, and a Settings that is just the key and a Show / Hide button. Then v2.2, after a bug hunt. The repo went from 126 tests to 354.
 
 ## 2. Origin, in my words
 
@@ -56,6 +56,7 @@ Then I asked for the README you're probably reading next to this:
 | Nov 5 | v2: random entrances and exits, he comes back after 5 minutes, hops, Victory, a waddle, the mark in the title bar. 311 tests | `v2` |
 | Nov 5 | v2.1: Undo on each fixed row, a History per doc, the toolbar button calls him back while he's away, the full name in the title bar. 332 tests | `v2.1` |
 | Nov 5 | v2.1.1: X is not a snooze, Settings is just the key and Show / Hide, idles never stall or repeat, a reload never leaves a doc without him. 342 tests | `v2.1.1` |
+| Nov 5 | v2.2: the bug hunt's fixes (never stuck hidden, never off screen), the panel keeps its tail, a new small icon, the boot splash banner. 354 tests | `v2.2` |
 
 ## 4. Round by round
 
@@ -175,6 +176,19 @@ Then, the same night, v2.1.1:
 - **Asked, Show / Hide:** "There should be a show hide button in here that ALWAYS works no matter what." It's the big button in Settings. It cuts off whatever he was doing and puts him there or takes him away. If the extension was reloaded under an open doc, the old copy of him now takes itself down and a fresh one goes in, so the button, and the doc, never end up with nobody, or with two.
 - **Tested:** 342 tests. The built extension, on a stand-in Docs page, came back for an old install with every old switch set wrong, idled 45 seconds without sitting still longer than 6, showed and hid from Settings, and after a reload of the extension itself, ended up with exactly one of him on the open doc.
 
+### Round 13: v2.2 (November 5)
+
+"Clippy randomly broke... I kept opening and closing it a bunch of times and eventually it just stopped showing up. Make sure that's not a bug..." A separate bug hunt took it apart while the rest of this round got built.
+
+- **Found, mostly a reload:** most of what I hit was the extension reloading under an open doc, which left that tab with a dead copy of him. v2.1.1 already fixed that: the dead copy takes itself down and a fresh one goes in.
+- **Found and fixed, stuck hidden:** a storage read that's in flight while the extension reloads never answers. He was waiting on one before every entrance and exit, with his sprite already hidden, so one stranded read kept him gone, and every draw after it queued behind it. Now nothing he waits on can hang: storage gives up after 400 milliseconds and he carries on without it, and if anything is ever still "playing" after 12 seconds, he resets himself without anyone clicking.
+- **Found and fixed, off screen:** he only checked the window size when he first appeared. Shrink the window, or drag him past the edge, and he was off screen, and Show put him right back there. Now a drag stops at the edge, a smaller window pulls him back in, and every entrance and Show checks first.
+- **Found and fixed, the panel without its tail:** after a reload the panel sometimes opened a bit wider with no tail pointing at him. It had been saving its own position every time its notes filled in, and a saved position pins it. Now it remembers only where you dragged it and a size you set yourself.
+- **Owed from 2.1.1:** the no-repeat idle bag was supposed to carry across tabs and reloads. It wasn't hooked up. Now it is.
+- **Picked, a smaller icon:** the option called "1.5x, heavier shaft". The 16 and 32 pixel icons in the toolbar, the panel's title bar and Settings are new, squares snapped to whole pixels and the curves smoothed. The big icons stay as they were.
+- **Picked, a banner:** the boot splash, "this one for sure!" It's at the top of the README: a 1997 boot screen with Clippee waiting at the end of the progress bar.
+- **Tested:** 354 tests, including the bug hunt's own repro of the stranded read, the watchdog, a shrinking window, a drag past the edge and the panel layout. The built extension, in Chromium: dragged past the corner he stayed inside, a window shrunk to 900 by 560 brought him back fully in view, and the panel opened beside him with its tail across three reloads.
+
 ## 5. Feature family tree
 
 ```
@@ -194,6 +208,7 @@ Then, the same night, v2.1.1:
          └─ v2: random entrances and exits → back in 5 min → hops, Victory, waddle
             └─ v2.1: Undo on the row → History per doc → the button calls him back
                └─ v2.1.1: Settings shrinks to the key → Show / Hide that always works → idles that never stall
+                  └─ v2.2: bug hunt → nothing can hang him → never off screen → the panel keeps its tail
 ```
 
 ## 6. Test log
@@ -218,6 +233,7 @@ Then, the same night, v2.1.1:
 | Nov 5 | v2: tests, types, build; built extension in clean Chromium; entrances and exits against the lab | 311 of 311 across 35 files; 504 of 504 frames identical to the lab | `v2`, local run |
 | Nov 5 | v2.1: tests, types, both builds; built extension on a stand-in Docs page that takes edits | 332 of 332 across 37 files; apply, row Undo and Redo, History across a reload, the button while he's away | `v2.1`, local run |
 | Nov 5 | v2.1.1: tests, types, both builds; built extension, including a reload of the extension under an open doc | 342 of 342 across 40 files; one copy of him after the reload | `v2.1.1`, local run |
+| Nov 5 | v2.2: tests, types, both builds; built extension: drag past the edge, a shrinking window, the panel across three reloads, the new marks at 1x and 2x | 354 of 354 across 42 files | `v2.2`, local run |
 
 There's no CI on this repo yet. Every number above comes from a run on my machine. The fake Docs in the tests is shaped like the live API, and the real Docs gets checked by hand.
 
