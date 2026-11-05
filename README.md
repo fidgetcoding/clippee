@@ -42,7 +42,7 @@ What the letter costs me: one rename. What the same reach costs in ads: more tha
 
 A cease and desist is the only marketing a trillion dollar company will ever do for me for free. It arrives on letterhead. Someone with a law degree had to read my README to write it. That’s more engagement than most of my posts get.
 
-And no, that isn’t Clippy. Look closer. That’s Clippee. Heavier eyebrows. Rounder head. A bottom loop that, if you squint, explains the name Microshaft. All 18 of his animations are redrawn from scratch on the original 1997 timings, so he blinks where Clippy blinked and knocks on the glass where Clippy knocked. The resemblance is the point. It took seven rounds to get exactly this close.
+And no, that isn’t Clippy. Look closer. That’s Clippee. Heavier eyebrows. Rounder head. A bottom loop that, if you squint, explains the name Microshaft. The 18 animations he inherited are redrawn from scratch on the original 1997 timings, so he blinks where Clippy blinked and knocks on the glass where Clippy knocked. The two new ones, a victory waddle and an idle waddle, are all his. The resemblance is the point. It took seven rounds to get exactly this close.
 
 Microsoft retired him in 2001 and spent the next 25 years putting him in jokes, stickers, and Teams backgrounds. They know he’s better than they let him be. I’m just finishing the job.
 
@@ -84,7 +84,7 @@ Click the toolbar button and paste your key into **Step 1 · Your Claude API key
 
 Open any doc at `docs.google.com/document/d/…`. If the doc was already open before you installed him, reload the tab. He has to get in before Docs starts up, or the page stays unreadable to him.
 
-He shows up in the corner and says hello. Click him to open the panel. `Alt+Shift+C` shows or hides him.
+He makes an entrance in the corner and says hello. Click him to open the panel. `Alt+Shift+C` sends him off or calls him back.
 
 **Updating**
 
@@ -116,6 +116,8 @@ His first real catch was in a comic script of mine: “the same man the reader m
 
 **He checks your structure when you ask.** Type “check my structure” and he looks for things your intro promises that the rest of the doc never delivers.
 
+**He never just fades in.** He gets printed out on a dot matrix printer. He installs himself with a setup wizard. He punches through a blue screen, drills up through your page, or gets beamed down by a teleporter. Eleven ways in, eight ways out, shuffled so you won't see a repeat until he's done them all. Click his X and he leaves in style, then comes back on his own 15 minutes later, because that's who he is. Miss him sooner? Click the toolbar button. If your computer is set to reduce motion, he just walks on and off like a normal paperclip.
+
 **He looks the part.** A cream speech balloon with an indigo ribbon, beveled buttons, Tahoma and etched group boxes, all a few shades off the Windows 98 originals. He stands on his own next to the panel, never boxed inside it.
 
 **He’s fast where it counts.** The local checks read an 11,000 word document in about 64 milliseconds. The fixes come from Claude and take longer, which is why he writes them while you read.
@@ -131,10 +133,11 @@ His first real catch was in a comic script of mine: “the same man the reader m
 
 ```bash
 npm run dev            # watch mode
-npm test               # 285 tests across 34 files
+npm test               # 311 tests across 35 files
 npm run typecheck
 npm run build          # Chromium build into dist/
 npm run build:firefox  # Firefox build into dist-firefox/
+npm run fx             # rebuild the entrances and exits after editing src/fx/lab/
 ```
 
 Where things live:
@@ -145,6 +148,7 @@ Where things live:
 - `src/agent/`: the Claude calls, the prompts, the edit tool and the panel tool.
 - `src/content/`: the panel, notes, previews, Undo and the Ask box.
 - `src/character/`: the animation engine.
+- `src/fx/`: his entrances and exits. How they're built: [docs/ENTRANCES.md](docs/ENTRANCES.md).
 - `src/background/`: the service worker, which holds your key and makes the API calls.
 - `src/popup/`: Settings.
 - `src/corpus/`: Drive memory, built and switched off.

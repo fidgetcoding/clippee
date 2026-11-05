@@ -6,7 +6,7 @@ My words are quoted as I wrote them, typos fixed, nothing else. Commit hashes ar
 
 I wrote the idea down on August 27, 2026, researched it in 11 lanes, specced it in 21 decisions, and had a working Chrome and Firefox extension at 126 passing tests the next day. Then it sat on my machine, uncommitted, for two months.
 
-The real build happened November 2 to 5. In four days he learned to edit Google Docs, show every fix as a preview, write fixes before you ask and run his own panel from plain words. His panel came out of a design lab that opened with 54 options. He was called Mr. Clippy for most of that. On November 5 he became Clippee by Microshaft, with a logo and a palette of his own. The repo went from 126 tests to 285.
+The real build happened November 2 to 5. In four days he learned to edit Google Docs, show every fix as a preview, write fixes before you ask and run his own panel from plain words. His panel came out of a design lab that opened with 54 options. He was called Mr. Clippy for most of that. On November 5 he became Clippee by Microshaft, with a logo, a palette and art of his own, and that night he became v2: entrances, exits, and more jumping. The repo went from 126 tests to 311.
 
 ## 2. Origin, in my words
 
@@ -52,6 +52,8 @@ Then I asked for the README you're probably reading next to this:
 | Nov 5 | Palette lab, 2 rounds. Warmer locked | `7e12fd2` |
 | Nov 5 | Logo lab, 4 rounds and a final. Microshaft icon shipped | `a5179e0` |
 | Nov 5 | Clippee's own art: 18 animations redrawn on the 1997 timings, Microsoft's pack removed, Thinking while fixes draft. 285 tests | `cc622fd` |
+| Nov 5 | Tagged v1 | `v1` |
+| Nov 5 | v2: random entrances and exits, he comes back after 15 minutes, hops, Victory, a waddle, the mark in the title bar. 311 tests | `v2` |
 
 ## 4. Round by round
 
@@ -140,6 +142,18 @@ I opened it on a real doc:
 - **Removed:** Microsoft's sprite pack. Clippee started out wearing their 1997 sprite sheet because I was trying to evolve their paperclip, not invent a new one, and every round above ran on it. Once he had art of his own, I took their files out of the repo and out of its history before going public. What's left is the evolution. Old settings that still name the pack fall back to Clippee.
 - **Tested:** 285 tests, including a check that the pack has every animation the code plays by name and that every frame points inside the sprite sheet.
 
+### Round 11: v2 (November 5)
+
+"Let's call the current version v1, and this next one is v2." Then: "All the feedback from all these labs weaved in, ya? Colors, animations, logo, etc."
+
+- **The ask:** something big every time he appears, and every time he leaves after you click X. "I don't like the basic fade in fade out." Twenty entrance and exit pairs came back in four families: 1997 machines, paperclip physics, cartoon physics and big superhero stuff.
+- **Picked:** 11 entrances and 8 exits. Some only half won. On the blue screen: "I like the entry here, not the exit." On the rubber band: "I like the exit, not the entry." I'd planned on alternating two, then changed my mind: "I guess the entrances and exits will have to be random and just cycle through as the person uses it... more than 2 options like I said last time."
+- **Built, entrances and exits:** every arrival is a random entrance and every departure a random exit, from shuffle bags that remember their place across tabs, so nothing repeats until he's used them all. The effects are the lab's own code, bundled as is and checked frame by frame against the lab. They draw on their own layer: the superhero landing still cracks the ground, but your doc never shakes. Reduce motion on your computer and he walks on and off plain.
+- **Built, coming back:** "He should always reappear again after a certain amount of time as a rule, or you can click the extension button up top." His X sends him off for 15 minutes and keeps tips quiet for exactly that long. The toolbar button brings him back sooner.
+- **Built, jumping:** "I think he can jump around a bit more when he's excited, or like penguin waddle in certain situations." Greeting hops while he waves, Congratulate does hops and a pogo bounce, Victory is a waddle after Fix all lands, and a new idle waddles a few steps and back.
+- **Built, logo in context:** the Microshaft mark now sits left of "Clippee" in the panel's title bar and in Settings, like the logo lab showed it.
+- **Tested:** 311 tests, including the pools, the bag never repeating back to back, the 15 minute return, the toolbar summon, the reduced motion path and the new animations pinned by pixel hash. The built extension ran in a clean Chromium against a stand-in Docs page.
+
 ## 5. Feature family tree
 
 ```
@@ -156,6 +170,7 @@ I opened it on a real doc:
    ├─ chat on every screen → the panel runs from plain words
    └─ rename → Microshaft logo lab → Warmer palette → recolored logo → icon
       └─ his own art → Thinking while fixes draft
+         └─ v2: random entrances and exits → back in 15 min → hops, Victory, waddle
 ```
 
 ## 6. Test log
@@ -177,6 +192,7 @@ I opened it on a real doc:
 | Nov 5 | My run for these docs, at `a5179e0` | 280 of 280 across 33 files, types, both builds | Local run |
 | Nov 5 | `tests/size.bench.test.ts`, same run | 64 ms at 11,040 words | Local run |
 | Nov 5 | My run again, at `cc622fd` after the new art | 285 of 285 across 34 files, types, both builds; bench 48 ms | Local run |
+| Nov 5 | v2: tests, types, build; built extension in clean Chromium; entrances and exits against the lab | 311 of 311 across 35 files; 504 of 504 frames identical to the lab | `v2`, local run |
 
 There's no CI on this repo yet. Every number above comes from a run on my machine. The fake Docs in the tests is shaped like the live API, and the real Docs gets checked by hand.
 

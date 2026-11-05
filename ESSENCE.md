@@ -9,6 +9,7 @@
 **What's different.**
 
 - He's a character, not a sidebar. He stands on his own next to your doc, animates, and talks in a speech balloon.
+- He makes an entrance. Eleven ways in and eight ways out (a dot matrix printer, a setup wizard, a magnet, a teleporter), shuffled so none repeats until he's used them all. Send him off and he's back in 15 minutes.
 - He knows when to shut up. He waits for 15 seconds of quiet, speaks up on his own at most once every 10 minutes, and a kind of tip you wave off three times never comes back.
 - Nothing in your doc changes until you click. Every fix is a preview with Apply or Skip, every applied fix has Undo, and Undo turns into Redo. Fix all does the lot with one Undo.
 - The fixes are already written when you look. Opening the panel starts drafting them in the background, three at a time after the first one warms Claude's cache.
@@ -29,9 +30,10 @@ Load `dist/` at `chrome://extensions` with Developer mode on, paste your key int
 
 **What works today.**
 
-- 285 of 285 tests pass across 34 files at `cc622fd`, with strict types and both the Chromium and Firefox builds. That's my own run on November 5, 2026. There's no CI on this repo yet.
+- 311 of 311 tests pass across 35 files at `v2`, with strict types and both the Chromium and Firefox builds. That's my own run on November 5, 2026. There's no CI on this repo yet.
+- The built v2 extension, loaded into a clean Chromium against a stand-in Docs page, played three random entrances and three random exits and came back when summoned. The bundled effects match the animation lab pixel for pixel (504 of 504 frames checked).
 - The local checks read an 11,040 word document in 48 to 64 ms across my runs (`tests/size.bench.test.ts`).
 - The release commit `3b5c153` passed 249 tests plus 15 checks on the built extension in clean Chromium profiles: startup, panel open and close, enable and disable, and settings that survive a full browser restart.
 - In my own Chrome on my own Google Docs: reading a real doc (his first catch was a phrase I'd written twice in a comic script), replacing, deleting and splitting text through the page, and the preview, Apply and Undo flow.
-- The character on screen is Clippee's own art in `src/packs/clippee/`: all 18 animations the extension plays, redrawn on the 1997 timings. Microsoft's sprite pack is gone. See [NOTICE.md](NOTICE.md).
+- The character on screen is Clippee's own art in `src/packs/clippee/`: the 18 animations the extension always played, redrawn on the 1997 timings, plus a victory waddle and an idle waddle. Microsoft's sprite pack is gone. See [NOTICE.md](NOTICE.md).
 - Running the panel from plain words passes its tests but hasn't had much real use against the live API yet. Firefox builds, but I test in Chrome.
