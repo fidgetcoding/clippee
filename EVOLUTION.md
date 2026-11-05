@@ -6,7 +6,7 @@ My words are quoted as I wrote them, typos fixed, nothing else. Commit hashes ar
 
 I wrote the idea down on August 27, 2026, researched it in 11 lanes, specced it in 21 decisions, and had a working Chrome and Firefox extension at 126 passing tests the next day. Then it sat on my machine, uncommitted, for two months.
 
-The real build happened November 2 to 5. In four days he learned to edit Google Docs, show every fix as a preview, write fixes before you ask and run his own panel from plain words. His panel came out of a design lab that opened with 54 options. He was called Mr. Clippy for most of that. On November 5 he became Clippee by Microshaft, with a logo, a palette and art of his own, and that night he became v2: entrances, exits, and more jumping. Then v2.1: a History and Undo on every fixed row. The repo went from 126 tests to 332.
+The real build happened November 2 to 5. In four days he learned to edit Google Docs, show every fix as a preview, write fixes before you ask and run his own panel from plain words. His panel came out of a design lab that opened with 54 options. He was called Mr. Clippy for most of that. On November 5 he became Clippee by Microshaft, with a logo, a palette and art of his own, and that night he became v2: entrances, exits, and more jumping. Then v2.1: a History and Undo on every fixed row, and a Settings that is just the key and a Show / Hide button. The repo went from 126 tests to 342.
 
 ## 2. Origin, in my words
 
@@ -55,6 +55,7 @@ Then I asked for the README you're probably reading next to this:
 | Nov 5 | Tagged v1 | `v1` |
 | Nov 5 | v2: random entrances and exits, he comes back after 5 minutes, hops, Victory, a waddle, the mark in the title bar. 311 tests | `v2` |
 | Nov 5 | v2.1: Undo on each fixed row, a History per doc, the toolbar button calls him back while he's away, the full name in the title bar. 332 tests | `v2.1` |
+| Nov 5 | v2.1.1: X is not a snooze, Settings is just the key and Show / Hide, idles never stall or repeat, a reload never leaves a doc without him. 342 tests | `v2.1.1` |
 
 ## 4. Round by round
 
@@ -166,6 +167,14 @@ My verdict on v2, minus one word: "This is literally PERFECT." Then a few things
 - **Asked, the name:** "Need to say Clippee by Microshaft." The title bar and Settings now say the whole thing.
 - **Tested:** 332 tests, including Undo and Redo on a row, the History recording fixes, Fix all and chat edits, the History surviving a remount, the cap and Clear, refusing an undo over changed text, the chat commands, the button per tab and the return that waits for you. The built extension ran on a stand-in Docs page that really takes edits.
 
+Then, the same night, v2.1.1:
+
+- **Asked, X is not a snooze:** after his X, Settings said "Snoozed 5 more minutes". Mine: "Shouldn't say this." Now X only sends him away. "Snoozed" means a snooze somebody asked for.
+- **Asked, Settings:** "Tbh we can get rid of all these settings. No sound is default." Settings is now the key and one button. The master switch, the per-site switch, sounds, test mode, the snooze row and "Forget what I've dismissed" are gone, and an old install that had any of them set the wrong way comes back on, unmuted, with no sound. Mute and snooze still work from his chat.
+- **Asked, idles:** "He's a bit too dormant when he's idle. And also you shouldn't repeat ANYTHING until he has cycled through all animations." Two causes. After one idle ended, nothing booked the next, so he froze until something happened. And the 1997 idles mostly roll the dice and skip themselves (one does 97 times in 100), while two others loop for minutes. Now each idle books the next, every idle he picks actually plays and winds down after a few seconds, and he goes through all nine before any repeats, remembered across tabs and reloads.
+- **Asked, Show / Hide:** "There should be a show hide button in here that ALWAYS works no matter what." It's the big button in Settings. It cuts off whatever he was doing and puts him there or takes him away. If the extension was reloaded under an open doc, the old copy of him now takes itself down and a fresh one goes in, so the button, and the doc, never end up with nobody, or with two.
+- **Tested:** 342 tests. The built extension, on a stand-in Docs page, came back for an old install with every old switch set wrong, idled 45 seconds without sitting still longer than 6, showed and hid from Settings, and after a reload of the extension itself, ended up with exactly one of him on the open doc.
+
 ## 5. Feature family tree
 
 ```
@@ -184,6 +193,7 @@ My verdict on v2, minus one word: "This is literally PERFECT." Then a few things
       └─ his own art → Thinking while fixes draft
          └─ v2: random entrances and exits → back in 5 min → hops, Victory, waddle
             └─ v2.1: Undo on the row → History per doc → the button calls him back
+               └─ v2.1.1: Settings shrinks to the key → Show / Hide that always works → idles that never stall
 ```
 
 ## 6. Test log
@@ -207,6 +217,7 @@ My verdict on v2, minus one word: "This is literally PERFECT." Then a few things
 | Nov 5 | My run again, at `9d0d335` after the new art | 285 of 285 across 34 files, types, both builds; bench 48 ms | Local run |
 | Nov 5 | v2: tests, types, build; built extension in clean Chromium; entrances and exits against the lab | 311 of 311 across 35 files; 504 of 504 frames identical to the lab | `v2`, local run |
 | Nov 5 | v2.1: tests, types, both builds; built extension on a stand-in Docs page that takes edits | 332 of 332 across 37 files; apply, row Undo and Redo, History across a reload, the button while he's away | `v2.1`, local run |
+| Nov 5 | v2.1.1: tests, types, both builds; built extension, including a reload of the extension under an open doc | 342 of 342 across 40 files; one copy of him after the reload | `v2.1.1`, local run |
 
 There's no CI on this repo yet. Every number above comes from a run on my machine. The fake Docs in the tests is shaped like the live API, and the real Docs gets checked by hand.
 

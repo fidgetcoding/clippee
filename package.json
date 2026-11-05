@@ -1,6 +1,6 @@
 {
   "name": "clippee",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": true,
   "type": "module",
   "description": "The paperclip is back, and this time he read your doc. Notes and one-click fixes for Google Docs.",

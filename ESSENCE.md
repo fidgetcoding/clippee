@@ -9,6 +9,8 @@
 **What's different.**
 
 - He's a character, not a sidebar. He stands on his own next to your doc, animates, and talks in a speech balloon.
+- Settings is just your API key and a Show / Hide button that always works. Mute and snooze live in his chat. No sounds.
+- He keeps busy. Between jobs he runs through all nine idles, never repeating one until he's done them all.
 - He makes an entrance. Eleven ways in and eight ways out (a dot matrix printer, a setup wizard, a magnet, a teleporter), shuffled so none repeats until he's used them all. Send him off and he's back in 5 minutes.
 - He knows when to shut up. He waits for 15 seconds of quiet, speaks up on his own at most once every 10 minutes, and a kind of tip you wave off three times never comes back.
 - Nothing in your doc changes until you click. Every fix is a preview with Apply or Skip, every applied fix has Undo (on its row in the list, too), and Undo turns into Redo. Fix all does the lot with one Undo.
@@ -31,7 +33,7 @@ Load `dist/` at `chrome://extensions` with Developer mode on, paste your key int
 
 **What works today.**
 
-- 332 of 332 tests pass across 37 files at `v2.1`, with strict types and both the Chromium and Firefox builds. That's my own run on November 5, 2026. There's no CI on this repo yet.
+- 342 of 342 tests pass across 40 files at `v2.1.1`, with strict types and both the Chromium and Firefox builds. That's my own run on November 5, 2026. There's no CI on this repo yet.
 - The built v2 extension, loaded into a clean Chromium against a stand-in Docs page, played three random entrances and three random exits and came back when summoned. The bundled effects match the animation lab pixel for pixel (504 of 504 frames checked).
 - The built v2.1 extension, on a stand-in Docs page that really takes edits, applied a fix, undid and redid it from its row, kept the History through a reload, undid from the History after the reload, and with him away the toolbar button had no popup and called him back.
 - The local checks read an 11,040 word document in 48 to 64 ms across my runs (`tests/size.bench.test.ts`).

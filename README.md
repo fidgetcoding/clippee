@@ -78,7 +78,7 @@ Leave the folder where it is. Chrome knows the extension by its path, so a moved
 
 **3. Give him your key**
 
-Click the toolbar button and paste your key into **Step 1 · Your Claude API key**. It’s stored on this machine only, never synced, and it stays in the extension’s background worker, so the page you’re writing in never sees it. If your key says it needs a workspace, open **Key says it needs a workspace?** and paste the workspace ID.
+Click the toolbar button and paste your key into **Your Claude API key**. That's all Settings is now: your key, plus one big button that shows or hides him on the doc you're in, and it works whatever state he's in. It’s stored on this machine only, never synced, and it stays in the extension’s background worker, so the page you’re writing in never sees it. If your key says it needs a workspace, open **Key says it needs a workspace?** and paste the workspace ID.
 
 **4. Open a Google Doc**
 
@@ -114,7 +114,9 @@ His first real catch was in a comic script of mine: “the same man the reader m
 
 **You can talk to him on every screen.** The Ask box sits at the bottom of every view. Ask about a fix, ask him to change something, or tell him what to do with the panel. “hide applied”, “undo all”, “go back” and “snooze 1h” run instantly on your machine with no call to Claude, and “hid applied” still works. Anything looser goes to Claude with a snapshot of the panel. He presses the same buttons you would, then tells you in one line what he did.
 
-**He knows when to shut up.** This is the part 1997 got wrong. He waits for 15 seconds of quiet, speaks up on his own at most once every 10 minutes, and never interrupts you mid thought. Wave off the same kind of tip three times and he never shows it again. Clippy learned nothing. Clippee learns that.
+**He knows when to shut up.** This is the part 1997 got wrong. He waits for 15 seconds of quiet, speaks up on his own at most once every 10 minutes, and never interrupts you mid thought. Wave off the same kind of tip three times and he never shows it again. Clippy learned nothing. Clippee learns that. Want quiet? Type “mute” or “snooze 1h” in his chat. No sounds, ever. You're welcome.
+
+**He doesn't zone out.** Between jobs he fidgets through all nine of his idles, and he won't do one twice until he's done every one.
 
 **He checks your structure when you ask.** Type “check my structure” and he looks for things your intro promises that the rest of the doc never delivers.
 
@@ -135,7 +137,7 @@ His first real catch was in a comic script of mine: “the same man the reader m
 
 ```bash
 npm run dev            # watch mode
-npm test               # 332 tests across 37 files
+npm test               # 342 tests across 40 files
 npm run typecheck
 npm run build          # Chromium build into dist/
 npm run build:firefox  # Firefox build into dist-firefox/
