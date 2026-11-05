@@ -7,16 +7,30 @@ import { ext, hasExtensionApis } from '../platform';
  */
 export interface Layout {
   agent?: { x: number; y: number };
-  panel?: { left: number; top: number; width?: number; height?: number };
+  /**
+   * Only what the user chose: a spot from dragging the title bar (then the
+   * panel is pinned there, with no tail), a size from the corner grip.
+   * `v: 2` marks a layout saved by those alone.
+   */
+  panel?: { left?: number; top?: number; width?: number; height?: number; v?: 2 };
 }
 
 const KEY = 'mrclippy:layout';
 
+/**
+ * Before v2.2 the panel saved its spot and size after any change, his own
+ * notes filling in included, so the next open came back pinned: a little
+ * wider and with no tail pointing at him. Those layouts carry no mark and are
+ * dropped; the panel goes back beside him.
+ */
 export async function loadLayout(): Promise<Layout> {
   if (!hasExtensionApis()) return {};
   const stored = await ext.storage.local.get(KEY);
   const value = stored[KEY];
-  return value && typeof value === 'object' ? (value as Layout) : {};
+  if (!value || typeof value !== 'object') return {};
+  const layout = { ...(value as Layout) };
+  if (layout.panel?.v !== 2) delete layout.panel;
+  return layout;
 }
 
 export async function saveLayout(patch: Layout): Promise<void> {
@@ -42,7 +56,7 @@ export function makePanelMovable(
 
   if (saved?.width) el.style.width = `${Math.max(MIN_WIDTH, saved.width)}px`;
   if (saved?.height) el.style.height = `${Math.max(MIN_HEIGHT, saved.height)}px`;
-  if (saved) balloon.pin(saved.left, saved.top);
+  if (saved?.left !== undefined && saved.top !== undefined) balloon.pin(saved.left, saved.top);
   // The panel is wider than the placeholder it replaced: place it again.
   else balloon.position();
 
@@ -63,12 +77,7 @@ export function makePanelMovable(
     drag = undefined;
     if (handle.hasPointerCapture(e.pointerId)) handle.releasePointerCapture(e.pointerId);
     const at = balloon.pinnedAt;
-    if (at) void saveLayout({ panel: { ...currentSize(), left: at.left, top: at.top } });
-  };
-
-  const currentSize = (): { width: number; height: number } => {
-    const rect = el.getBoundingClientRect();
-    return { width: Math.round(rect.width), height: Math.round(rect.height) };
+    if (at) void saveLayout({ panel: { ...chosenSize(el), left: at.left, top: at.top, v: 2 } });
   };
 
   handle.addEventListener('pointerdown', down);
@@ -87,9 +96,8 @@ export function makePanelMovable(
           balloon.position();
           if (timer !== undefined) clearTimeout(timer);
           timer = setTimeout(() => {
-            const rect = el.getBoundingClientRect();
-            const at = balloon.pinnedAt ?? { left: rect.left, top: rect.top };
-            void saveLayout({ panel: { ...currentSize(), left: at.left, top: at.top } });
+            const panel = layoutToSave(el, balloon.pinnedAt);
+            if (panel) void saveLayout({ panel });
           }, 400);
         });
   observer?.observe(el);
@@ -106,4 +114,23 @@ export function makePanelMovable(
     el.style.height = '';
     balloon.unpin();
   };
+}
+
+/**
+ * The size the user gave it with the corner grip, which the browser writes as
+ * an inline width and height. Content growing on its own sets neither.
+ */
+function chosenSize(el: HTMLElement): { width?: number; height?: number } {
+  const width = parseFloat(el.style.width), height = parseFloat(el.style.height);
+  return { ...(width > 0 ? { width: Math.round(width) } : {}), ...(height > 0 ? { height: Math.round(height) } : {}) };
+}
+
+/**
+ * What a resize is worth remembering: a size the user chose, and the spot only
+ * if they dragged it there. Nothing when the panel merely grew with its notes.
+ */
+export function layoutToSave(el: HTMLElement, pinned: { left: number; top: number } | undefined): Layout['panel'] {
+  const size = chosenSize(el);
+  if (size.width === undefined && size.height === undefined && !pinned) return undefined;
+  return { ...size, ...(pinned ? { left: pinned.left, top: pinned.top } : {}), v: 2 };
 }
