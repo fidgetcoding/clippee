@@ -55,7 +55,9 @@ export function wireNotes(w: NotesWiring): { controls: NoteEntry[]; fixAll(): Fi
   let bar: FixAllBar | undefined;
   const refreshFixAll = (): void => {
     const fixable = controls.filter((c) => c.canFix && !c.dismissed);
-    bar = fixable.length > 1 ? fixAllBar(fixable.map((c) => () => c.ensure()), (changes) => w.showFixAll(changes)) : undefined;
+    bar = fixable.length > 1
+      ? fixAllBar(fixable.map((c) => () => c.ensure()), (changes) => w.showFixAll(changes), options.onFixAllLanded)
+      : undefined;
     notes.setFixAll(bar?.el);
   };
 

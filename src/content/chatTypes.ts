@@ -70,6 +70,8 @@ export interface ChatPanelOptions {
   readonly onMute?: (muted: boolean) => Promise<unknown>;
   /** The document's name, for "on <title>" under the heading. */
   readonly docTitle?: string;
+  /** Fix all has finished and at least one fix landed. He celebrates. */
+  readonly onFixAllLanded?: () => void;
 }
 
 /** Where one thread stands, reported back to its line in the notes list. */

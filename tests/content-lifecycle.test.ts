@@ -221,7 +221,9 @@ it('keeps close-X hidden when its snooze update and unrelated settings arrive', 
   await vi.advanceTimersByTimeAsync(1);
   expect(agent.hidden).toBe(true);
   const mutation = state.sendMessage.mock.calls.find(([m]) => m.type === 'mrclippy:settings')![0].mutation;
-  expect(mutation.patch.snoozeUntil).toBeGreaterThan(Date.now() + 7 * 60 * 60_000);
+  // Quiet for exactly as long as he is gone: he comes back in 15 minutes.
+  expect(mutation.patch.snoozeUntil).toBeGreaterThan(Date.now() + 14 * 60_000);
+  expect(mutation.patch.snoozeUntil).toBeLessThanOrEqual(Date.now() + 15 * 60_000);
   changeSettings({ muted: true, snoozeUntil: mutation.patch.snoozeUntil });
   await vi.advanceTimersByTimeAsync(10000);
   expect(document.querySelector('#mrclippy-host')).toBe(host);
@@ -431,4 +433,36 @@ it('applies a snooze changed while frozen before proactive work resumes', async 
   await vi.advanceTimersByTimeAsync(17000);
   expect(state.read).not.toHaveBeenCalled();
   expect(document.querySelector('#mrclippy-host')!.shadowRoot!.querySelector('.mrclippy-nudge')).toBeNull();
+});
+
+it('comes back on his own 15 minutes after X', async () => {
+  vi.useFakeTimers();
+  await import('../src/content/index');
+  await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')).not.toBeNull());
+  const root = document.querySelector('#mrclippy-host')!.shadowRoot!;
+  const agent = root.querySelector<HTMLElement>('.mrclippy-agent')!;
+  root.querySelector<HTMLButtonElement>('.mrclippy-agent-close')!.click();
+  await vi.advanceTimersByTimeAsync(5 * 60_000);
+  expect(agent.hidden).toBe(true);
+  await vi.advanceTimersByTimeAsync(10 * 60_000);
+  expect(agent.hidden).toBe(false);
+});
+
+it('comes back at once when the toolbar popup summons him, and ignores it while he is here', async () => {
+  vi.useFakeTimers();
+  await import('../src/content/index');
+  await vi.waitFor(() => expect(document.querySelector('#mrclippy-host')).not.toBeNull());
+  const message = state.addListener.mock.calls[0]![0];
+  const root = document.querySelector('#mrclippy-host')!.shadowRoot!;
+  const agent = root.querySelector<HTMLElement>('.mrclippy-agent')!;
+  message({ type: 'mrclippy:summon' });
+  expect(agent.hidden).toBe(false);
+  root.querySelector<HTMLButtonElement>('.mrclippy-agent-close')!.click();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(agent.hidden).toBe(true);
+  message({ type: 'mrclippy:summon' });
+  expect(agent.hidden).toBe(false);
+  // The summon replaced the 15 minute return: nothing brings him back twice.
+  await vi.advanceTimersByTimeAsync(15 * 60_000);
+  expect(agent.hidden).toBe(false);
 });

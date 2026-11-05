@@ -23,6 +23,10 @@ import type { AskResponse, AuditResponse, ChatTurn, DocumentEdit } from '../agen
 import type { PanelState, SnoozeLength } from '../agent/panelTools';
 import { EditHistory } from './editHistory';
 import { startPageLifecycle, type PageRuntime } from './pageLifecycle';
+import { GREETING_WAVE_FRAME, Presence, RETURN_AFTER_MS, prefersReducedMotion } from './presence';
+import { askForKey, hasApiKey, openSettings } from './settingsLink';
+import { FxPlayer } from '../fx/FxPlayer';
+import { FxDeck } from '../fx/pools';
 
 const DISMISSAL_KEY = 'mrclippy:dismissals';
 
@@ -33,12 +37,12 @@ const SNOOZE_MS: Readonly<Record<SnoozeLength, number>> = {
   today: SNOOZE_DURATIONS_MS['Rest of today'],
 };
 
-/** Clicking the X sends him away for the rest of the working day. */
-const HIDE_DURATION_MS = 8 * 60 * 60_000;
-
 /** Test mode drops both gates so suggestions surface immediately. */
 const DEBUG_GAP_MS = 5_000;
 const DEBUG_SILENCE_MS = 3_000;
+
+/** The greeting holds for 7s; the key prompt follows once it has cleared. */
+const KEY_PROMPT_DELAY_MS = 9_000;
 
 /**
  * Content-script entry.
@@ -48,35 +52,6 @@ const DEBUG_SILENCE_MS = 3_000;
  * `agent.play()` for a suggestion — the only direct calls are the greeting and
  * an explicit click, both of which the user initiated.
  */
-/**
- * Ask the background to open Settings. It owns the window; we only ask. A
- * click always goes through; an automatic ask (a request failed for want of
- * a key) goes once per few seconds, since several failing together is one
- * problem.
- */
-let lastAutoSettings = 0;
-function openSettings(clicked = true): void {
-  if (!clicked) {
-    if (Date.now() - lastAutoSettings < 5_000) return;
-    lastAutoSettings = Date.now();
-  }
-  void ext.runtime.sendMessage({ type: 'mrclippy:open-settings' }).catch(() => undefined);
-}
-
-async function hasApiKey(): Promise<boolean> {
-  try {
-    const reply = (await ext.runtime.sendMessage({ type: 'mrclippy:has-key' })) as
-      | { hasKey?: boolean }
-      | undefined;
-    return typeof reply?.hasKey === 'boolean' ? reply.hasKey : true;
-  } catch {
-    return true; // Unknown: don't nag on a guess.
-  }
-}
-
-/** The greeting holds for 7s; the key prompt follows once it has cleared. */
-const KEY_PROMPT_DELAY_MS = 9_000;
-
 async function mountRuntime(
   settings: Settings, current: () => boolean, hidden: boolean,
 ): Promise<PageRuntime | undefined> {
@@ -104,13 +79,31 @@ async function mountRuntime(
     ...(layout.agent ? { position: layout.agent } : {}),
     onMoved: (position) => void saveLayout({ agent: position }),
     onClick: () => onAgentClick(),
+    // X: he leaves with an exit, and tips stay quiet for exactly as long as he
+    // is gone. He comes back on his own, or with the toolbar button.
     onDismiss: () => {
       closePanel();
-      agent.hide();
-      void savePreferences({ snoozeUntil: Date.now() + HIDE_DURATION_MS }).catch(() => undefined);
+      presence.leave();
+      void savePreferences({ snoozeUntil: Date.now() + RETURN_AFTER_MS }).catch(() => undefined);
     },
   });
   host.root.append(agent.root, agent.balloon.el);
+  const player = new FxPlayer(host.root), deck = new FxDeck();
+  const presence = new Presence({
+    agent, player, next: (kind) => deck.next(kind),
+    // Loaded the first time he makes an entrance, not with the page.
+    effects: () => import('../fx/generated/labFx').then((m) => m.createLabFx()),
+    reducedMotion: prefersReducedMotion,
+    onArrived: (returning, entered) => {
+      // Greeting draws him in from a bare wire before he waves. After an
+      // entrance he is already standing there, so it starts at the wave.
+      void agent.play('Greeting', entered ? GREETING_WAVE_FRAME : 0);
+      if (!returning) {
+        agent.nudge('It looks like you are writing something. Click me if you want a hand.');
+        promptForKey();
+      }
+    },
+  });
 
   const renderer = new Renderer(agent, queue, detector, {
     ...(settings.debugMode ? { minGapMs: DEBUG_GAP_MS } : {}),
@@ -384,6 +377,7 @@ async function mountRuntime(
         onSnooze: (length) => savePreferences({ snoozeUntil: Date.now() + SNOOZE_MS[length] }),
         // Unmute means suggestions again now, so it ends a snooze as well.
         onMute: (muted) => savePreferences(muted ? { muted } : { muted, snoozeUntil: 0 }),
+        onFixAllLanded: () => void agent.play('Victory'),
       });
 
       panelNeedsKey = !hasKey;
@@ -424,35 +418,19 @@ async function mountRuntime(
   const stopChecks = detector.on((bp) => void runChecks(bp).catch(() => undefined));
 
   detector.start();
-  if (!hidden) {
-    agent.show();
-    void agent.play('Greeting');
-    agent.nudge('It looks like you are writing something. Click me if you want a hand.');
-  }
+  if (hidden) presence.startAway();
+  else presence.arrive();
 
   // First run: right after the greeting, the one setup step that matters.
-  void hasApiKey().then((hasKey) => {
-    if (hasKey || disposed || !agent.isVisible) return;
-    keyPromptTimer = setTimeout(() => {
-      if (disposed || !agent.isVisible || agent.balloon.isLocked) return; // They already opened something.
-      void agent.play('GetAttention');
-      agent.balloon.suggest(
-        'Before I can help, I need your Claude API key. Paste it in Settings.',
-        [
-          { label: 'Later', run: () => agent.balloon.hide() },
-          {
-            label: 'Open Settings',
-            primary: true,
-            run: () => {
-              agent.balloon.hide();
-              openSettings();
-            },
-          },
-        ],
-        'Clippee',
-      );
-    }, KEY_PROMPT_DELAY_MS);
-  });
+  function promptForKey(): void {
+    void hasApiKey().then((hasKey) => {
+      if (hasKey || disposed || !agent.isVisible) return;
+      keyPromptTimer = setTimeout(() => {
+        if (disposed || !agent.isVisible || agent.balloon.isLocked) return; // They already opened something.
+        askForKey(agent);
+      }, KEY_PROMPT_DELAY_MS);
+    });
+  }
 
   // Settings is another window. Coming back from it with a key pasted, the
   // open panel starts over and drafts every fix, with no second click.
@@ -470,12 +448,14 @@ async function mountRuntime(
     if (!message || typeof message !== 'object') return;
     const type = (message as { type?: unknown }).type;
     if (disposed) return;
+    // The shortcut sends him off or calls him back, with the same entrances
+    // and exits as X and the toolbar button.
     if (type === 'mrclippy:toggle') {
-      if (agent.isVisible) {
-        closePanel();
-        agent.hide();
-      } else agent.show();
+      if (presence.here) closePanel();
+      presence.toggle();
     }
+    // The toolbar button: the popup asks the tab to bring him back now.
+    if (type === 'mrclippy:summon' && !presence.here) presence.arrive();
     if (type === 'mrclippy:mute') {
       void toggleMuted().catch(() => undefined);
     }
@@ -494,12 +474,14 @@ async function mountRuntime(
     editHistory.dispose();
     source.dispose?.();
     highlighter.dispose();
+    presence.dispose();
+    player.destroy();
     agent.destroy();
     host.destroy();
   }
 
   return {
-    get hidden() { return !agent.isVisible; },
+    get hidden() { return !presence.here; },
     update(next) {
       settings = next;
       renderer.setMuted(isSilenced(settings));

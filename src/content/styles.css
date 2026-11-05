@@ -50,8 +50,20 @@
 }
 
 .mrclippy-sprite {
-  image-rendering: auto;
+  /* Hard pixels on high-density screens, matching the entrance and exit overlay. */
+  image-rendering: pixelated;
   pointer-events: none;
+}
+
+/* Entrances and exits: one stage over the whole window. Never takes a click,
+   and never moves the page under it. */
+.mrclippy-fx {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2147483001;
+  pointer-events: none;
+  image-rendering: pixelated;
 }
 
 /* His own dismiss button, shown on hover. Not part of the panel. */

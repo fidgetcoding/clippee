@@ -24,6 +24,8 @@ export class Animator {
   private currentAnimation: Animation | undefined;
   private currentFrame: Frame | undefined;
   private currentFrameIndex = 0;
+  /** Where the next animation begins. Usually 0. */
+  private startIndex = 0;
   private exiting = false;
   private started = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -81,11 +83,13 @@ export class Animator {
 
   /**
    * Begin `name`. Returns false if the pack has no such animation.
-   * `onEnd` fires once the animation reaches its final frame.
+   * `onEnd` fires once the animation reaches its final frame. `from` skips
+   * ahead to that frame, for an animation whose opening is already on screen.
    */
-  play(name: string, onEnd?: AnimationEndCallback): boolean {
+  play(name: string, onEnd?: AnimationEndCallback, from = 0): boolean {
     const animation = this.pack.data.animations[name];
     if (!animation || animation.frames.length === 0) return false;
+    this.startIndex = Math.min(Math.max(0, Math.floor(from)), animation.frames.length - 1);
 
     this.exiting = false;
     this.currentAnimation = animation;
@@ -143,7 +147,7 @@ export class Animator {
    */
   private nextFrameIndex(): number {
     if (!this.currentAnimation) return 0;
-    if (!this.currentFrame) return 0;
+    if (!this.currentFrame) return this.startIndex;
 
     const frame = this.currentFrame;
 

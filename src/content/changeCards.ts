@@ -353,10 +353,12 @@ export interface FixAllBar {
  * "Fix all": says exactly what it will do before it does it, waits for any
  * drafts still in flight, applies every one, then hands the whole set to
  * `onDone`, which shows it with a single Undo that takes all of it back.
+ * `onLanded` hears once, when at least one fix went in.
  */
 export function fixAllBar(
   fixable: readonly (() => { thread: Thread })[],
   onDone: (changes: AgentChange[]) => void,
+  onLanded?: () => void,
 ): FixAllBar {
   const bar = document.createElement('div');
   bar.className = 'mrclippy-fixall';
@@ -404,6 +406,7 @@ export function fixAllBar(
     run.replaceWith(again);
     hint.textContent = `Applied ${landed} of ${changes.length}. Undo all is on that screen.`;
     onDone(changes);
+    if (landed > 0) onLanded?.();
     return changes;
   };
   run.addEventListener('click', () => void go());

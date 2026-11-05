@@ -8,6 +8,7 @@ import {
   toggleHost,
   type Settings,
 } from '../settings';
+import { summonOnActiveTab } from './summon';
 
 const DISMISSAL_KEY = 'mrclippy:dismissals';
 
@@ -62,6 +63,7 @@ function paint(settings: Settings, host: string | undefined): void {
 }
 
 async function main(): Promise<void> {
+  void summonOnActiveTab();
   const host = await currentHost();
   let settings = await loadSettings();
   paint(settings, host);

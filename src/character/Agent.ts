@@ -115,13 +115,23 @@ export class Agent {
     return this.shown;
   }
 
-  show(): void {
+  /** Top-left of his sprite box, in viewport pixels. Entrances and exits start here. */
+  get spot(): { x: number; y: number } {
+    return { ...this.position };
+  }
+
+  /**
+   * `animated` plays the pack's Show. Without it he is simply there, at rest:
+   * that is how an entrance ends, since the entrance already brought him in.
+   */
+  show(animated = true): void {
     if (this.shown || this.destroyed) return;
     if (this.hideTimer !== undefined) clearTimeout(this.hideTimer);
     this.hideTimer = undefined;
     this.shown = true;
     this.root.hidden = false;
-    if (this.animator.has('Show')) this.play('Show');
+    const entrance = animated ? 'Show' : 'RestPose';
+    if (this.animator.has(entrance)) void this.play(entrance);
     else this.idle.schedule();
   }
 
@@ -163,8 +173,11 @@ export class Agent {
     if (!this.root.hidden) this.hideTimer = setTimeout(finish, HIDE_BACKSTOP_MS);
   }
 
-  /** Queue an animation. Resolves when it finishes or is skipped. */
-  play(name: string): Promise<void> {
+  /**
+   * Queue an animation. Resolves when it finishes or is skipped. `from` starts
+   * it partway in, when its opening would repeat what is already on screen.
+   */
+  play(name: string, from = 0): Promise<void> {
     return new Promise((resolve) => {
       if (this.destroyed || !this.animator.has(name)) {
         resolve();
@@ -178,7 +191,7 @@ export class Agent {
         };
         const started = this.animator.play(name, (_n, state) => {
           if (state === AnimatorState.Exited) finish();
-        });
+        }, from);
         if (!started) finish();
       }, resolve);
     });
