@@ -14,7 +14,7 @@ export default defineManifest({
   manifest_version: 3,
   name: 'Clippee by Microshaft',
   version: '0.1.0',
-  description: 'The paperclip is back, and this time he read your doc. Notes and one-click fixes for Google Docs, Word, and Notion.',
+  description: 'The paperclip is back, and this time he read your doc. Notes and one-click fixes for Google Docs.',
 
   permissions: ['storage', 'tabs'],
 

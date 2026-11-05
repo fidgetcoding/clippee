@@ -2,7 +2,7 @@
 
 **It looks like you’re reading a README. Would you like help?**
 
-Clippee is the paperclip from Office 97, back from the dead, with a brain this time. He lives in Google Docs, Word on the web, and Notion, reads what you wrote, and tells you something useful about it. Then he leaves you alone. Mostly.
+Clippee is the paperclip from Office 97, back from the dead, with a brain this time. He lives in Google Docs, reads what you wrote, and tells you something useful about it. Then he leaves you alone. Mostly.
 
 ## Why I made this
 
