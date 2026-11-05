@@ -131,7 +131,7 @@ His first real catch was in a comic script of mine: “the same man the reader m
 
 ```bash
 npm run dev            # watch mode
-npm test               # 280 tests across 33 files
+npm test               # 285 tests across 34 files
 npm run typecheck
 npm run build          # Chromium build into dist/
 npm run build:firefox  # Firefox build into dist-firefox/

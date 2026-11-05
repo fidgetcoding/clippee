@@ -6,7 +6,7 @@ My words are quoted as I wrote them, typos fixed, nothing else. Commit hashes ar
 
 I wrote the idea down on August 27, 2026, researched it in 11 lanes, specced it in 21 decisions, and had a working Chrome and Firefox extension at 126 passing tests the next day. Then it sat on my machine, uncommitted, for two months.
 
-The real build happened November 2 to 5. In four days he learned to edit Google Docs, show every fix as a preview, write fixes before you ask and run his own panel from plain words. His panel came out of a design lab that opened with 54 options. He was called Mr. Clippy for most of that. On November 5 he became Clippee by Microshaft, with a logo and a palette of his own. The repo went from 126 tests to 280.
+The real build happened November 2 to 5. In four days he learned to edit Google Docs, show every fix as a preview, write fixes before you ask and run his own panel from plain words. His panel came out of a design lab that opened with 54 options. He was called Mr. Clippy for most of that. On November 5 he became Clippee by Microshaft, with a logo and a palette of his own. The repo went from 126 tests to 285.
 
 ## 2. Origin, in my words
 
@@ -51,6 +51,7 @@ Then I asked for the README you're probably reading next to this:
 | Nov 5 | Ask box on every screen; the panel runs from plain words. 280 tests | `d870d45` |
 | Nov 5 | Palette lab, 2 rounds. Warmer locked | `5b2e251` |
 | Nov 5 | Logo lab, 4 rounds and a final. Microshaft icon shipped | `0b1a173` |
+| Nov 5 | Clippee's own art: 18 animations redrawn on the 1997 timings, Microsoft's pack removed, Thinking while fixes draft. 285 tests | `2f95b6c` |
 
 ## 4. Round by round
 
@@ -154,6 +155,7 @@ I opened it on a real doc:
    │  └─ no close button → close X → the closed panel that stayed open
    ├─ chat on every screen → the panel runs from plain words
    └─ rename → Microshaft logo lab → Warmer palette → recolored logo → icon
+      └─ his own art → Thinking while fixes draft
 ```
 
 ## 6. Test log
@@ -174,6 +176,7 @@ I opened it on a real doc:
 | Nov 5 | Tests after chat everywhere and the palette | 280 | Private note, `d870d45`, `5b2e251` |
 | Nov 5 | My run for these docs, at `0b1a173` | 280 of 280 across 33 files, types, both builds | Local run |
 | Nov 5 | `tests/size.bench.test.ts`, same run | 64 ms at 11,040 words | Local run |
+| Nov 5 | My run again, at `2f95b6c` after the new art | 285 of 285 across 34 files, types, both builds; bench 48 ms | Local run |
 
 There's no CI on this repo yet. Every number above comes from a run on my machine. The fake Docs in the tests is shaped like the live API, and the real Docs gets checked by hand.
 
